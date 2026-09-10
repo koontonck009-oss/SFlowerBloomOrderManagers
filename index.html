@@ -451,6 +451,10 @@
                             <i class="fa-solid fa-print"></i>
                             <span>ใบสั่งงาน</span>
                         </button>
+                        <button @click="openMessageModal(order)" title="สร้างข้อความแจ้งลูกค้า" class="px-3 py-2.5 sm:px-2.5 sm:py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-medium border border-orange-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs">
+                            <i class="fa-solid fa-comment-dots"></i>
+                            <span>แจ้งลูกค้า</span>
+                        </button>
                     </div>
                     
                     <div class="flex items-center gap-1">
@@ -536,6 +540,9 @@
                             <div class="flex items-center justify-center gap-1">
                                 <button @click="printSingleWorkOrder(order)" title="พิมพ์ใบสั่งงาน" class="p-2 md:p-1.5 hover:bg-pink-50 text-pink-600 rounded-lg">
                                     <i class="fa-solid fa-print"></i>
+                                </button>
+                                <button @click="openMessageModal(order)" title="สร้างข้อความแจ้งลูกค้า" class="p-2 md:p-1.5 hover:bg-orange-50 text-orange-600 rounded-lg">
+                                    <i class="fa-solid fa-comment-dots"></i>
                                 </button>
                                 <button @click="openReceiptModal(order)" title="พิมพ์ใบเสร็จ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg">
                                     <i class="fa-solid fa-receipt"></i>
@@ -882,6 +889,106 @@
             </div>
         </div>
 
+        <!-- Customer Notification Message Modal -->
+        <div v-if="isMessageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto no-print">
+            <div class="bg-white sm:rounded-2xl shadow-xl w-full sm:max-w-4xl min-h-screen sm:min-h-0 sm:max-h-[92vh] flex flex-col">
+                <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-amber-500 to-orange-500 shrink-0">
+                    <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-comment-dots"></i> สร้างข้อความแจ้งลูกค้า
+                    </h3>
+                    <button @click="closeMessageModal" class="text-white/80 hover:text-white transition-colors p-1">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- Left: Form -->
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-bold text-slate-700">รายการสินค้า</label>
+                                <button type="button" @click="addMessageItem" class="text-xs px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-medium">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มสินค้า
+                                </button>
+                            </div>
+                            <div class="space-y-2">
+                                <div v-for="item in messageItems" :key="item.id" class="p-3 bg-amber-50 rounded-xl border border-amber-100 relative space-y-2">
+                                    <button v-if="messageItems.length > 1" type="button" @click="removeMessageItem(item.id)" class="absolute top-2 right-2 text-rose-400 hover:text-rose-600 text-xs p-1">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                    <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <input v-model.number="item.qty" type="number" placeholder="จำนวน" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
+                                        <input v-model="item.unit" type="text" placeholder="หน่วย" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
+                                        <input v-model.number="item.price" type="number" placeholder="ราคา/หน่วย" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-bold text-slate-700 block mb-1">วิธีจัดส่ง</label>
+                                <select v-model="messageForm.shippingMethod" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                    <option value="shipping">📦 จัดส่งพัสดุ</option>
+                                    <option value="pickup">🏠 นัดรับ</option>
+                                </select>
+                            </div>
+                            <div v-if="messageForm.shippingMethod === 'shipping'">
+                                <label class="text-xs font-bold text-slate-700 block mb-1">ค่าจัดส่ง (บาท)</label>
+                                <input v-model.number="messageForm.shippingFee" type="number" placeholder="0" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div v-else>
+                                <label class="text-xs font-bold text-slate-700 block mb-1">สถานที่นัดรับ</label>
+                                <input v-model="messageForm.pickupLocation" type="text" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-xs font-bold text-slate-700 block mb-1">วันที่จัดส่ง/นัดรับ</label>
+                                <input v-model="messageForm.deliveryDateText" type="text" placeholder="เช่น 20 มกราคม" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-bold text-slate-700 block mb-1">รูปแบบการชำระเงิน</label>
+                            <select v-model="messageForm.paymentMode" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <option value="default">💖 โอนเต็ม/มัดจำ</option>
+                                <option value="transfer_only">💰 โอนเท่านั้น</option>
+                                <option value="cod">🚚 เก็บเงินปลายทาง</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-bold text-slate-700 block mb-1">{{ messageForm.paymentMode === 'cod' ? 'ยอดรวมที่ต้องเก็บ' : 'ยอดโอนเต็ม' }} (บาท)</label>
+                                <input v-model.number="messageForm.fullPay" type="number" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div v-if="messageForm.paymentMode === 'default'">
+                                <label class="text-xs font-bold text-slate-700 block mb-1">ยอดมัดจำ (บาท)</label>
+                                <input v-model.number="messageForm.deposit" type="number" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-xs font-medium text-orange-700 cursor-pointer">
+                            <input type="checkbox" v-model="messageForm.includeNote" class="rounded text-orange-500 w-4 h-4">
+                            แสดงหมายเหตุ (เรื่องการใส่การ์ด)
+                        </label>
+                    </div>
+
+                    <!-- Right: Preview -->
+                    <div class="flex flex-col">
+                        <label class="text-xs font-bold text-slate-700 mb-2">ตัวอย่างข้อความ (แตะเพื่อเลือกทั้งหมด)</label>
+                        <div @click="selectMessageText" class="flex-1 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm whitespace-pre-wrap text-slate-800 leading-relaxed min-h-[280px] cursor-pointer hover:bg-amber-100/70 transition-colors select-all" ref="messagePreviewEl">{{ generatedMessage }}</div>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
+                    <button @click="copyMessageToClipboard" class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95">
+                        <i class="fa-solid fa-copy"></i> คัดลอกข้อความ
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div v-if="receiptTarget" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto no-print">
             <div class="bg-white sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-slate-200 w-full max-w-lg min-h-full sm:min-h-0 overflow-hidden sm:my-6">
                 <div class="p-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
@@ -993,6 +1100,20 @@
                 const receiptTarget = ref(null);
                 const selectedForPrint = ref([]);
                 const ordersToPrint = ref([]);
+
+                // Customer Notification Message Modal
+                const isMessageModalOpen = ref(false);
+                const messageItems = ref([{ id: Date.now(), details: '', qty: 1, unit: 'ช่อ', price: 0 }]);
+                const messageForm = ref({
+                    shippingMethod: 'shipping',
+                    shippingFee: 0,
+                    pickupLocation: '',
+                    deliveryDateText: '',
+                    paymentMode: 'default',
+                    fullPay: 0,
+                    deposit: 0,
+                    includeNote: true
+                });
 
                 const storeLocation = ref({
                     name: 'S.FLOWER BLOOM (สาขาหลัก)',
@@ -1205,6 +1326,134 @@
 
                 function openReceiptModal(order) { receiptTarget.value = order; }
                 function triggerPrintReceipt() { window.print(); }
+
+                // Customer Notification Message Functions
+                function openMessageModal(order) {
+                    messageItems.value = [{
+                        id: Date.now(),
+                        details: order.products || '',
+                        qty: 1,
+                        unit: 'ช่อ',
+                        price: order.totalAmount || 0
+                    }];
+                    messageForm.value = {
+                        shippingMethod: order.deliveryType === 'pickup' ? 'pickup' : 'shipping',
+                        shippingFee: 0,
+                        pickupLocation: order.deliveryType === 'pickup' ? (order.location || '') : '',
+                        deliveryDateText: order.deliveryDate ? formatDate(order.deliveryDate) : '',
+                        paymentMode: 'default',
+                        fullPay: order.totalAmount || 0,
+                        deposit: order.depositAmount || 0,
+                        includeNote: true
+                    };
+                    isMessageModalOpen.value = true;
+                }
+
+                function closeMessageModal() {
+                    isMessageModalOpen.value = false;
+                }
+
+                function addMessageItem() {
+                    messageItems.value.push({ id: Date.now() + Math.random(), details: '', qty: 1, unit: 'ช่อ', price: 0 });
+                }
+
+                function removeMessageItem(id) {
+                    if (messageItems.value.length <= 1) return;
+                    messageItems.value = messageItems.value.filter(i => i.id !== id);
+                }
+
+                const messageTotal = computed(() => {
+                    const subtotal = messageItems.value.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.price) || 0), 0);
+                    const fee = messageForm.value.shippingMethod === 'shipping' ? (Number(messageForm.value.shippingFee) || 0) : 0;
+                    return subtotal + fee;
+                });
+
+                watch(() => messageForm.value.paymentMode, (mode) => {
+                    if (mode === 'cod') {
+                        messageForm.value.fullPay = messageTotal.value;
+                    }
+                });
+
+                const generatedMessage = computed(() => {
+                    const totalStr = messageTotal.value.toLocaleString();
+
+                    let itemsText = '';
+                    messageItems.value.forEach(item => {
+                        const qty = Number(item.qty) || 0;
+                        const price = Number(item.price) || 0;
+                        const itemTotal = qty * price;
+                        itemsText += `🌻💐 ${item.details || ' - '}\n`;
+                        if (qty > 1) {
+                            itemsText += `จำนวน ${qty} ${item.unit || ''} x ${price.toLocaleString()} บ. = ${itemTotal.toLocaleString()} บาท\n`;
+                        } else {
+                            itemsText += `จำนวน ${qty} ${item.unit || ''} = ${itemTotal.toLocaleString()} บาท\n`;
+                        }
+                    });
+
+                    const deliveryDateText = messageForm.value.deliveryDateText || ' - ';
+                    let shippingText = '', transportNotice = '', dateText = '';
+                    if (messageForm.value.shippingMethod === 'shipping') {
+                        const fee = Number(messageForm.value.shippingFee) || 0;
+                        const feeText = fee === 0 ? 'ส่งฟรี' : `${fee.toLocaleString()} บาท`;
+                        shippingText = `📦 รอบจัดส่งพัสดุ (ค่าส่ง ${feeText})`;
+                        dateText = `📅 ${deliveryDateText} (หรืออาจไวกว่านี้ได้ตามคิวค่ะ)`;
+                        transportNotice = `⏳ ขนส่งใช้เวลา 2–3 วันในการจัดส่ง ถึงมือลูกค้า`;
+                    } else {
+                        shippingText = `📦 นัดรับ (นครสวรรค์ส่งฟรี)`;
+                        dateText = `📅 ${deliveryDateText}`;
+                        transportNotice = `📍 ${messageForm.value.pickupLocation || ' - '}`;
+                    }
+
+                    const fullPay = Number(messageForm.value.fullPay);
+                    const fullPayStr = isNaN(fullPay) ? ' - ' : fullPay.toLocaleString();
+                    const deposit = Number(messageForm.value.deposit);
+                    const depositStr = (isNaN(deposit) || deposit === 0) ? ' - ' : deposit.toLocaleString();
+
+                    let paymentMessage = '';
+                    if (messageForm.value.paymentMode === 'default') {
+                        paymentMessage = `💖 การชำระเงิน 💖\nคุณลูกค้าสามารถเลือกได้ 2 แบบค่ะ \n1.โอนเต็มยอด ${fullPayStr} บาท\n2.มัดจำ ${depositStr} บาท (ส่วนที่เหลือชำระตอนผลงานเสร็จ)\n\nคุณลูกค้าสามารถโอนชำระยอดได้เลยตามรายละเอียดที่ทางร้านแจ้งไว้นะคะ 💖`;
+                    } else if (messageForm.value.paymentMode === 'transfer_only') {
+                        paymentMessage = `💖 การชำระเงิน 💖\nคุณลูกค้าสามารถโอนชำระยอดเต็มจำนวน ${fullPayStr} บาท\nตามรายละเอียดที่ทางร้านแจ้งไว้นะคะ 💖`;
+                    } else {
+                        paymentMessage = `🚚 การชำระเงิน 🚚\nรายการนี้เป็นการชำระเงินแบบเก็บเงินปลายทางนะคะ\nยอดรวมที่ต้องชำระคือ ${fullPayStr} บาท ค่ะ 💖`;
+                    }
+
+                    let noteContent = '';
+                    if (messageForm.value.includeNote) {
+                        noteContent = `\n**หมายเหตุ**\nหากลูกค้าอยากใส่การ์ด สามารถแจ้งทางร้านได้เลยค่ะ 💌 จะใส่ข้อความหรือรูปภาพที่ต้องการก็ได้ ไม่มีค่าใช้จ่ายเพิ่มเติมค่ะ 😊`;
+                    }
+
+                    return `🌻 ทางร้านขอแจ้งรายละเอียดนะคะ 🌻\n${itemsText}\n${shippingText}\n${dateText} \n${transportNotice} \n\nยอดรวมทั้งสิ้น ${totalStr} บาท\n\n${paymentMessage}\n\nเมื่อเสร็จแล้วทางร้านจะถ่ายรูปให้ดูนะคะ 🥰${noteContent}`;
+                });
+
+                function selectMessageText(event) {
+                    const range = document.createRange();
+                    range.selectNodeContents(event.currentTarget);
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+
+                async function copyMessageToClipboard() {
+                    const text = generatedMessage.value;
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(text);
+                        } else {
+                            const textArea = document.createElement('textarea');
+                            textArea.value = text;
+                            textArea.style.position = 'fixed';
+                            textArea.style.left = '-9999px';
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                        }
+                        showToast('คัดลอกข้อความสำเร็จแล้ว! ✅');
+                    } catch (err) {
+                        showToast('คัดลอกไม่สำเร็จ ลองแตะเลือกข้อความแล้วคัดลอกเองครับ');
+                    }
+                }
 
                 function copyShippingAddress(order) {
                     const text = `ชื่อผู้รับ: ${order.customerName}\nเบอร์โทร: ${order.customerPhone || '-'}\nที่อยู่จัดส่ง: ${order.location || '-'}`;
@@ -1468,7 +1717,10 @@
                     getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange,
                     printSingleWorkOrder, openBatchPrintModal, openReceiptModal, triggerPrintReceipt,
                     copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
-                    handleFormImageUpload, rotateFormImage, removeFormImage
+                    handleFormImageUpload, rotateFormImage, removeFormImage,
+                    isMessageModalOpen, messageItems, messageForm, generatedMessage,
+                    openMessageModal, closeMessageModal, addMessageItem, removeMessageItem,
+                    selectMessageText, copyMessageToClipboard
                 };
             }
         }).mount('#app');
