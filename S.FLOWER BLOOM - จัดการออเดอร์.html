@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการออเดอร์ & พิมพ์ใบสั่งงาน S.FLOWER BLOOM</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt & Sarabun -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vue 3 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <!-- Leaflet OpenStreetMap CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'Sarabun', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fdf2f8',
+                            100: '#fce7f3',
+                            500: '#ec4899',
+                            600: '#db2777',
+                            700: '#be185d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Prompt', 'Sarabun', sans-serif;
+            background-color: #f8fafc;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        #order-map, #store-map {
+            height: 200px;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+
+        /* Print styles for Receipt and Work Order printing */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-work-orders, #printable-work-orders *, #printable-receipt, #printable-receipt * {
+                visibility: visible;
+            }
+            #printable-work-orders {
+                display: block !important;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background: white !important;
+            }
+            .print-page {
+                box-shadow: none !important;
+                padding: 4mm 6mm !important;
+                margin: 0 auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 272mm !important;
+                max-height: 272mm !important;
+                min-height: 0 !important;
+                border: none !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                overflow: hidden !important;
+                background: white !important;
+            }
+            .print-page:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+            .image-frame {
+                max-height: 145mm !important;
+                height: 145mm !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            @page {
+                size: A4 portrait;
+                margin: 5mm;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen pb-12">
+
+    <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+
+        <!-- Header Bar & Dashboard -->
+        <header class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 sm:p-5 mb-4 sm:mb-6 no-print">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-md shadow-pink-500/20 text-lg sm:text-xl font-bold">
+                        🌸
+                    </div>
+                    <div class="min-w-0">
+                        <h1 class="text-base sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">S.FLOWER BLOOM - จัดการออเดอร์ & พิมพ์ใบสั่งงาน</h1>
+                        <p class="hidden sm:block text-xs text-slate-500">ระบบจัดการออเดอร์ ขนส่งพัสดุ นัดรับ และพิมพ์ใบสั่งงาน</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full md:w-auto">
+                    <button @click="openModal()" class="w-full sm:w-auto px-4 py-3 sm:py-2 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 text-sm">
+                        <i class="fa-solid fa-plus text-sm"></i>
+                        <span>สร้างออเดอร์ใหม่</span>
+                    </button>
+
+                    <div class="grid grid-cols-2 sm:contents gap-2">
+                        <!-- Store location button -->
+                        <button @click="openStoreModal()" title="ตั้งค่าตำแหน่งร้านค้า" class="min-w-0 px-3 py-2.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-xl border border-indigo-200 transition-all flex items-center justify-center sm:justify-start gap-1.5">
+                            <i class="fa-solid fa-store shrink-0"></i>
+                            <span class="truncate">📍 {{ storeLocation.name }}</span>
+                        </button>
+
+                        <!-- Work Order Batch Print Button -->
+                        <button @click="openBatchPrintModal" title="พิมพ์ใบสั่งงานที่เลือก" class="min-w-0 px-3.5 py-2.5 sm:py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-semibold rounded-xl border border-pink-200 transition-all flex items-center justify-center sm:justify-start gap-1.5">
+                            <i class="fa-solid fa-print shrink-0"></i>
+                            <span class="truncate">พิมพ์ใบสั่งงาน ({{ selectedForPrint.length }})</span>
+                        </button>
+
+                        <button @click="exportDataJSON()" title="ส่งออกข้อมูลสำรอง" class="px-3 py-2.5 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center sm:justify-start gap-1.5">
+                            <i class="fa-solid fa-file-export text-slate-500"></i>
+                            <span>Export</span>
+                        </button>
+                        <label class="px-3 py-2.5 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start gap-1.5">
+                            <i class="fa-solid fa-file-import text-slate-500"></i>
+                            <span>Import</span>
+                            <input type="file" @change="importDataJSON" accept=".json" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-slate-100">
+                <div class="bg-slate-50 rounded-xl p-2.5 sm:p-3 border border-slate-100">
+                    <span class="text-[11px] sm:text-xs font-medium text-slate-500 block">ออเดอร์ทั้งหมด</span>
+                    <span class="text-lg sm:text-xl font-bold text-slate-800">{{ orders.length }} <span class="text-xs font-normal text-slate-500">รายการ</span></span>
+                </div>
+                <div class="bg-amber-50/60 rounded-xl p-2.5 sm:p-3 border border-amber-100/80">
+                    <span class="text-[11px] sm:text-xs font-medium text-amber-700 block">รอส่งพัสดุ / นัดรับ</span>
+                    <span class="text-lg sm:text-xl font-bold text-amber-800">{{ pendingCount }} <span class="text-xs font-normal text-amber-600">รายการ</span></span>
+                </div>
+                <div class="bg-emerald-50/60 rounded-xl p-2.5 sm:p-3 border border-emerald-100/80">
+                    <span class="text-[11px] sm:text-xs font-medium text-emerald-700 block">ยอดรวมมัดจำแล้ว</span>
+                    <span class="text-lg sm:text-xl font-bold text-emerald-800">฿{{ formatNumber(totalDepositSum) }}</span>
+                </div>
+                <div class="bg-rose-50/60 rounded-xl p-2.5 sm:p-3 border border-rose-100/80">
+                    <span class="text-[11px] sm:text-xs font-medium text-rose-700 block">ยอดค้างชำระรวม</span>
+                    <span class="text-lg sm:text-xl font-bold text-rose-800">฿{{ formatNumber(totalRemainingSum) }}</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-4 mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 no-print">
+            <div class="flex flex-col lg:flex-row justify-between items-center gap-3 sm:gap-4">
+                <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                    <!-- Search Input -->
+                    <div class="relative w-full sm:w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input v-model="searchQuery" type="search" placeholder="ค้นหาชื่อลูกค้า, สินค้า, เบอร์, เลขพัสดุ..." class="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all">
+                    </div>
+
+                    <!-- Sort Select Dropdown -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                        <span class="text-xs font-semibold text-slate-500 whitespace-nowrap"><i class="fa-solid fa-arrow-down-wide-short text-pink-600"></i> เรียงตาม:</span>
+                        <select v-model="sortBy" class="w-full sm:w-auto py-2.5 sm:py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer shadow-sm">
+                            <option value="delivery_asc">🚨 ด่วนสุด (กำหนดส่งใกล้นี้)</option>
+                            <option value="created_desc">🆕 ออเดอร์ใหม่ล่าสุด</option>
+                            <option value="remaining_desc">💰 ยอดค้างชำระ (มากไปน้อย)</option>
+                            <option value="distance_asc">📍 นัดรับใกล้ที่สุดก่อน (กม.)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- View Switcher & Date Preset Filter -->
+                <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+                    <select v-model="datePreset" class="flex-1 sm:flex-initial py-2.5 sm:py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer">
+                        <option value="all">📅 ทุกช่วงเวลาส่ง</option>
+                        <option value="today">⚡️ นัดส่ง/รับ วันนี้</option>
+                        <option value="tomorrow">⏳ นัดส่ง/รับ พรุ่งนี้</option>
+                        <option value="overdue">🚨 เกินกำหนดส่ง</option>
+                    </select>
+
+                    <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shrink-0">
+                        <button @click="currentView = 'grid'" :class="currentView === 'grid' ? 'bg-white text-pink-600 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'" class="px-3 py-2 sm:py-1.5 rounded-lg text-xs transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-border-all"></i>
+                            <span class="hidden sm:inline">การ์ด</span>
+                        </button>
+                        <button @click="currentView = 'table'" :class="currentView === 'table' ? 'bg-white text-pink-600 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'" class="px-3 py-2 sm:py-1.5 rounded-lg text-xs transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span class="hidden sm:inline">ตาราง</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs w-full sm:w-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                    <button @click="filterType = 'all'" :class="filterType === 'all' ? 'bg-slate-900 text-white font-medium' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-2 sm:py-1.5 rounded-lg whitespace-nowrap transition-colors">
+                        ทั้งหมด ({{ orders.length }})
+                    </button>
+                    <button @click="filterType = 'shipping'" :class="filterType === 'shipping' ? 'bg-sky-600 text-white font-medium' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-2 sm:py-1.5 rounded-lg whitespace-nowrap transition-colors">
+                        <i class="fa-solid fa-truck-fast mr-1"></i> จัดส่งพัสดุ ({{ shippingCount }})
+                    </button>
+                    <button @click="filterType = 'pickup'" :class="filterType === 'pickup' ? 'bg-indigo-600 text-white font-medium' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-2 sm:py-1.5 rounded-lg whitespace-nowrap transition-colors">
+                        <i class="fa-solid fa-store mr-1"></i> นัดรับหน้าร้าน ({{ pickupCount }})
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs w-full sm:w-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                    <span class="text-slate-400 font-semibold mr-1 shrink-0"><i class="fa-solid fa-filter"></i> สถานะ:</span>
+                    <button @click="statusFilter = 'all'" :class="statusFilter === 'all' ? 'bg-slate-800 text-white font-medium' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        ทั้งหมด
+                    </button>
+                    <button @click="statusFilter = 'pending'" :class="statusFilter === 'pending' ? 'bg-amber-500 text-white font-medium' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        🟡 รอดำเนินการ
+                    </button>
+                    <button @click="statusFilter = 'in_progress'" :class="statusFilter === 'in_progress' ? 'bg-sky-500 text-white font-medium' : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        🔵 กำลังทำ
+                    </button>
+                    <button @click="statusFilter = 'ready'" :class="statusFilter === 'ready' ? 'bg-indigo-500 text-white font-medium' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        🟣 พร้อมส่ง/รับ
+                    </button>
+                    <button @click="statusFilter = 'completed'" :class="statusFilter === 'completed' ? 'bg-emerald-500 text-white font-medium' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        🟢 ส่งสำเร็จ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="currentView === 'grid' && filteredOrders.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 no-print">
+            <div v-for="(order, index) in filteredOrders" :key="order.id" 
+                 class="rounded-2xl border shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group relative"
+                 :class="getDeliveryUrgency(order).cardClass">
+                
+                <!-- Urgent Banner -->
+                <div v-if="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' && order.status !== 'cancelled'"
+                     class="bg-rose-600 text-white font-bold text-xs px-4 py-2 flex items-center justify-between tracking-wide shadow-sm">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-sm animate-bounce"></i>
+                        <span>{{ getDeliveryUrgency(order).text }}</span>
+                    </span>
+                    <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">ด่วนมาก</span>
+                </div>
+                <div v-else-if="getDeliveryUrgency(order).type === 'today' && order.status !== 'completed' && order.status !== 'cancelled'"
+                     class="bg-amber-500 text-slate-900 font-bold text-xs px-4 py-2 flex items-center justify-between tracking-wide shadow-sm">
+                    <span class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-fire text-sm animate-pulse"></i>
+                        <span>{{ getDeliveryUrgency(order).text }}</span>
+                    </span>
+                    <span class="text-[10px] bg-slate-900/15 px-2 py-0.5 rounded-full font-bold">กำหนดส่งวันนี้</span>
+                </div>
+
+                <div>
+                    <div class="p-4 sm:p-5 border-b border-slate-100/80 relative">
+                        <div class="flex items-center justify-between gap-2 mb-3">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <!-- Print Selection Checkbox -->
+                                <label class="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded-lg">
+                                    <input type="checkbox" :value="order.id" v-model="selectedForPrint" class="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 cursor-pointer">
+                                    <span>เลือกพิมพ์</span>
+                                </label>
+
+                                <!-- Type Badge -->
+                                <span v-if="order.deliveryType === 'shipping'" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200/80">
+                                    <i class="fa-solid fa-truck-fast text-sky-600"></i> จัดส่งพัสดุ
+                                </span>
+                                <span v-else class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+                                    <i class="fa-solid fa-store text-indigo-600"></i> นัดรับ
+                                </span>
+                            </div>
+
+                            <select :value="order.status" @change="handleStatusChange(order, $event)" class="text-xs font-bold px-2 py-2 rounded-lg border focus:outline-none cursor-pointer transition-colors shadow-sm shrink-0" :class="getStatusClass(order.status)">
+                                <option value="pending">🟡 รอดำเนินการ</option>
+                                <option value="in_progress">🔵 กำลังทำสินค้า</option>
+                                <option value="ready">🟣 พร้อมส่ง/รับ</option>
+                                <option value="completed">🟢 ส่งสำเร็จ</option>
+                                <option value="cancelled">🔴 ยกเลิก</option>
+                            </select>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div v-if="order.status !== 'cancelled'" class="mt-3 mb-4 px-1 relative">
+                            <div class="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1.5 bg-slate-200/70 rounded-full z-0"></div>
+                            <div class="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full z-0 transition-all duration-500 ease-out" 
+                                 :class="getProgressColor(order.status)"
+                                 :style="`width: ${getProgressWidth(order.status)}%`"></div>
+                            
+                            <div class="flex justify-between relative z-10">
+                                <div v-for="step in ['pending', 'in_progress', 'ready', 'completed']" :key="step" 
+                                     class="w-3.5 h-3.5 rounded-full border-2 transition-colors duration-300"
+                                     :class="isStepActive(order.status, step) ? getProgressDotColor(order.status) : 'bg-white border-slate-300'">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Customer Name & Phone -->
+                        <h2 class="text-lg font-bold text-slate-900 group-hover:text-pink-600 transition-colors flex items-center justify-between mt-2">
+                            <span class="truncate">{{ order.customerName }}</span>
+                            <a v-if="order.customerPhone" :href="'tel:' + order.customerPhone" title="กดเพื่อโทรออก" class="text-xs text-pink-600 hover:text-pink-700 bg-pink-50 px-2 py-1 rounded-lg border border-pink-100 shrink-0 font-medium">
+                                <i class="fa-solid fa-phone text-[10px] mr-1"></i>{{ order.customerPhone }}
+                            </a>
+                        </h2>
+
+                        <p v-if="order.queueNo" class="text-xs text-slate-400 mt-0.5">คิวที่: {{ order.queueNo }}</p>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="p-4 sm:p-5 space-y-4 text-sm">
+                        <!-- Products List -->
+                        <div class="bg-white/70 rounded-xl p-3 border border-slate-200/70 shadow-2xs">
+                            <div class="text-xs font-semibold text-slate-500 mb-1 flex items-center gap-1.5">
+                                <i class="fa-solid fa-layer-group text-slate-400"></i>
+                                <span>รายการสินค้า:</span>
+                            </div>
+                            <p class="text-slate-800 font-medium whitespace-pre-line leading-relaxed">{{ order.products }}</p>
+                            <p v-if="order.notes" class="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg mt-2 border border-amber-100">
+                                📌 <strong>หมายเหตุ:</strong> {{ order.notes }}
+                            </p>
+                        </div>
+
+                        <!-- Dates -->
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                                <span class="text-slate-400 block mb-0.5"><i class="fa-regular fa-calendar-check mr-1"></i>วันที่สั่ง</span>
+                                <span class="font-medium text-slate-700">{{ formatDate(order.orderDate) }}</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg border transition-all"
+                                 :class="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' ? 'bg-rose-600 text-white border-rose-700 shadow-sm' : (getDeliveryUrgency(order).type === 'today' && order.status !== 'completed' ? 'bg-amber-400 text-slate-950 border-amber-500 font-bold shadow-sm' : 'bg-amber-50/70 border-amber-200 text-amber-900')">
+                                <span class="block mb-0.5 text-[11px] font-medium" :class="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' ? 'text-rose-100' : 'opacity-80'"><i class="fa-regular fa-calendar-xmark mr-1"></i>กำหนดส่ง/นัดรับ</span>
+                                <span class="font-bold text-sm">{{ formatDate(order.deliveryDate) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- PARCEL SHIPPING DISPLAY -->
+                        <div v-if="order.deliveryType === 'shipping'" class="bg-sky-50/60 rounded-xl p-3 border border-sky-100 text-xs space-y-2">
+                            <div class="flex items-center justify-between font-bold text-sky-900 border-b border-sky-100 pb-1.5">
+                                <span class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-box text-sky-600"></i>
+                                    <span>ที่อยู่จัดส่งพัสดุ:</span>
+                                </span>
+                                <span v-if="order.expressCompany" class="px-2 py-0.5 rounded bg-white border border-sky-200 text-sky-700 text-[11px]">
+                                    🚚 {{ order.expressCompany }}
+                                </span>
+                            </div>
+                            <p class="text-slate-700 leading-relaxed font-medium select-all">{{ order.location || 'ไม่ได้ระบุที่อยู่จัดส่ง' }}</p>
+                            <div class="pt-1 flex flex-col gap-1.5">
+                                <div v-if="order.trackingNumber" class="bg-white p-2 rounded-lg border border-sky-200 flex items-center justify-between">
+                                    <span class="text-slate-500 font-medium">เลขพัสดุ:</span>
+                                    <span class="font-mono font-bold text-sky-700 text-xs tracking-wider">{{ order.trackingNumber }}</span>
+                                </div>
+                                <div v-else class="text-[11px] text-amber-600 font-medium bg-amber-50/80 px-2 py-1 rounded border border-amber-100">
+                                    ⏳ ยังไม่ได้กรอกเลขพัสดุ
+                                </div>
+                                <button @click="copyShippingAddress(order)" title="คัดลอกที่อยู่ไปแปะหน้ากล่อง" class="w-full py-1.5 px-3 bg-white hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+                                    <i class="fa-regular fa-copy"></i>
+                                    <span>คัดลอก ชื่อ-ที่อยู่ จัดส่งพัสดุ</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- STORE PICKUP DISPLAY -->
+                        <div v-else class="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 text-xs space-y-1.5">
+                            <div class="flex items-center justify-between gap-1 mb-1">
+                                <span class="font-bold text-indigo-900 flex items-center gap-1">
+                                    <i class="fa-solid fa-location-dot text-indigo-600"></i>
+                                    <span>จุดนัดรับสินค้า / หน้าร้าน:</span>
+                                </span>
+                                <span v-if="getDistance(order) !== null" class="font-bold px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-700 text-[11px]">
+                                    📍 {{ getDistance(order) }} กม. จากร้าน
+                                </span>
+                            </div>
+                            <p class="text-slate-700 line-clamp-2 mb-2">{{ order.location || 'หน้าร้านค้าหลัก' }}</p>
+                            <a v-if="order.lat && order.lng" 
+                               :href="`https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`" 
+                               target="_blank" 
+                               class="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs">
+                                <i class="fa-solid fa-diamond-turn-right text-xs"></i>
+                                <span>เปิดแผนที่ Google Maps</span>
+                            </a>
+                            <span v-else class="text-[11px] text-slate-400 italic block">ไม่ได้ปักหมุดพิกัด</span>
+                        </div>
+
+                        <!-- Financial Summary -->
+                        <div class="rounded-xl border border-slate-200/80 p-3.5 bg-slate-50/70 space-y-2">
+                            <div class="flex justify-between items-center text-xs text-slate-600">
+                                <span>ยอดรวมสินค้า:</span>
+                                <span class="font-semibold text-slate-800">฿{{ formatNumber(order.totalAmount) }}</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xs text-slate-600">
+                                <span>ยอดมัดจำ/ชำระแล้ว:</span>
+                                <span class="font-semibold text-emerald-600">฿{{ formatNumber(order.depositAmount) }}</span>
+                            </div>
+                            <div class="pt-2 border-t border-slate-200/60 flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-700">ยอดคงเหลือ:</span>
+                                <span class="text-base font-bold" :class="getRemainingBalance(order) > 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                    ฿{{ formatNumber(getRemainingBalance(order)) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Actions -->
+                <div class="p-3 sm:p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        <button @click="printSingleWorkOrder(order)" title="พิมพ์ใบสั่งงาน" class="px-3 py-2.5 sm:px-2.5 sm:py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-medium border border-pink-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs">
+                            <i class="fa-solid fa-print"></i>
+                            <span>ใบสั่งงาน</span>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center gap-1">
+                        <button @click="openModal(order)" title="แก้ไขออเดอร์" class="p-2.5 sm:p-2 hover:bg-pink-50 text-pink-600 rounded-lg transition-colors">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button @click="confirmDelete(order)" title="ลบออเดอร์" class="p-2.5 sm:p-2 hover:bg-rose-50 text-rose-500 rounded-lg transition-colors">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-else-if="currentView === 'table' && filteredOrders.length > 0" class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-x-auto no-print">
+            <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+                    <tr>
+                        <th class="p-3 text-center">พิมพ์</th>
+                        <th class="p-3 md:p-4">รหัส & ชื่อลูกค้า</th>
+                        <th class="p-3 md:p-4">ประเภท</th>
+                        <th class="hidden lg:table-cell p-3 md:p-4">รายละเอียดจัดส่ง/ขนส่ง</th>
+                        <th class="p-3 md:p-4">กำหนดส่ง</th>
+                        <th class="p-3 md:p-4 text-right">ยอดรวม</th>
+                        <th class="hidden lg:table-cell p-3 md:p-4 text-right">มัดจำ</th>
+                        <th class="p-3 md:p-4 text-right">คงเหลือ</th>
+                        <th class="p-3 md:p-4 text-center">สถานะ</th>
+                        <th class="p-3 md:p-4 text-center">การจัดการ</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr v-for="order in filteredOrders" :key="order.id" class="hover:bg-slate-50/80 transition-colors">
+                        <td class="p-3 text-center">
+                            <input type="checkbox" :value="order.id" v-model="selectedForPrint" class="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 cursor-pointer">
+                        </td>
+                        <td class="p-3 md:p-4 font-medium text-slate-900">
+                            <div>{{ order.customerName }}</div>
+                            <div class="text-xs text-slate-400 font-normal">#{{ order.id.slice(-5) }} | คิว: {{ order.queueNo || '-' }}</div>
+                        </td>
+                        <td class="p-3 md:p-4 whitespace-nowrap">
+                            <span v-if="order.deliveryType === 'shipping'" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                📦 จัดส่งพัสดุ
+                            </span>
+                            <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                🏪 นัดรับ
+                            </span>
+                        </td>
+                        <td class="hidden lg:table-cell p-3 md:p-4 max-w-xs text-xs">
+                            <div v-if="order.deliveryType === 'shipping'">
+                                <div class="font-semibold text-slate-800 truncate" :title="order.location">{{ order.location || 'ไม่ระบุที่อยู่' }}</div>
+                                <div class="text-slate-500 mt-0.5">
+                                    <span v-if="order.expressCompany" class="font-bold text-sky-700 mr-1">[{{ order.expressCompany }}]</span>
+                                    <span v-if="order.trackingNumber" class="font-mono text-slate-700">เลขพัสดุ: {{ order.trackingNumber }}</span>
+                                </div>
+                            </div>
+                            <div v-else>
+                                <div class="text-slate-700 truncate" :title="order.location">{{ order.location || 'หน้าร้าน' }}</div>
+                                <span v-if="getDistance(order) !== null" class="font-bold text-indigo-700 text-[11px]">
+                                    📍 {{ getDistance(order) }} กม.
+                                </span>
+                            </div>
+                        </td>
+                        <td class="p-3 md:p-4 whitespace-nowrap">
+                            <span :class="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' ? 'text-rose-600 font-bold' : ''">
+                                {{ formatDate(order.deliveryDate) }}
+                            </span>
+                        </td>
+                        <td class="p-3 md:p-4 text-right font-semibold text-slate-800">฿{{ formatNumber(order.totalAmount) }}</td>
+                        <td class="hidden lg:table-cell p-3 md:p-4 text-right text-emerald-600">฿{{ formatNumber(order.depositAmount) }}</td>
+                        <td class="p-3 md:p-4 text-right font-bold" :class="getRemainingBalance(order) > 0 ? 'text-rose-600' : 'text-emerald-600'">
+                            ฿{{ formatNumber(getRemainingBalance(order)) }}
+                        </td>
+                        <td class="p-3 md:p-4 text-center">
+                            <select :value="order.status" @change="handleStatusChange(order, $event)" class="text-xs font-bold px-2 py-1.5 rounded-lg border cursor-pointer" :class="getStatusClass(order.status)">
+                                <option value="pending">🟡 รอดำเนินการ</option>
+                                <option value="in_progress">🔵 กำลังทำสินค้า</option>
+                                <option value="ready">🟣 พร้อมส่ง/รับ</option>
+                                <option value="completed">🟢 ส่งสำเร็จ</option>
+                                <option value="cancelled">🔴 ยกเลิก</option>
+                            </select>
+                        </td>
+                        <td class="p-3 md:p-4 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <button @click="printSingleWorkOrder(order)" title="พิมพ์ใบสั่งงาน" class="p-2 md:p-1.5 hover:bg-pink-50 text-pink-600 rounded-lg">
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
+                                <button @click="openReceiptModal(order)" title="พิมพ์ใบเสร็จ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg">
+                                    <i class="fa-solid fa-receipt"></i>
+                                </button>
+                                <button @click="openModal(order)" title="แก้ไข" class="p-2 md:p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button @click="confirmDelete(order)" title="ลบ" class="p-2 md:p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div v-else-if="filteredOrders.length === 0" class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center my-8 no-print">
+            <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-inbox text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800">ไม่พบข้อมูลออเดอร์</h3>
+            <p class="text-slate-500 text-sm mt-1 max-w-md mx-auto">ยังไม่มีรายการออเดอร์ที่ตรงกับเงื่อนไข สามารถกดปุ่ม "สร้างออเดอร์ใหม่" เพื่อเพิ่มข้อมูลได้ครับ</p>
+            <button @click="openModal()" class="mt-4 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-xl text-sm transition-all shadow-sm inline-flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i> เพิ่มออเดอร์แรก
+            </button>
+        </div>
+
+        <div id="printable-work-orders" class="hidden">
+            <div v-for="order in ordersToPrint" :key="order.id" class="print-page bg-white p-8 border border-slate-300 mb-8 rounded-xl font-sans">
+                <!-- Top Header -->
+                <div class="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-pink-600 text-white flex items-center justify-center text-xl font-bold shadow-sm">
+                            🌸
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900 tracking-wide">S.FLOWER BLOOM</h2>
+                            <p class="text-xs text-slate-600 font-semibold tracking-wider">ใบสั่งงานจัดดอกไม้ / WORK ORDER</p>
+                        </div>
+                    </div>
+                    <div class="text-right bg-slate-100 px-4 py-2 rounded-xl border border-slate-200">
+                        <div class="text-[11px] font-bold text-slate-700">คิวที่: <span class="text-pink-600 text-lg">{{ order.queueNo || '-' }}</span></div>
+                    </div>
+                </div>
+
+                <!-- Main Info Grid -->
+                <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+                        <div class="font-bold text-slate-900 border-b border-slate-200 pb-1 flex items-center gap-1.5 text-sm">
+                            <i class="fa-solid fa-user text-pink-600"></i>
+                            <span>ข้อมูลลูกค้าและการจัดส่ง</span>
+                        </div>
+                        <div><strong class="text-slate-600">ชื่อลูกค้า:</strong> <span class="text-slate-900 font-bold text-sm">{{ order.customerName }}</span></div>
+                        <div><strong class="text-slate-600">เบอร์โทรศัพท์:</strong> <span class="text-slate-900 font-semibold">{{ order.customerPhone || '-' }}</span></div>
+                        <div><strong class="text-slate-600">ประเภท:</strong> <span class="font-bold" :class="order.deliveryType === 'shipping' ? 'text-sky-600' : 'text-indigo-600'">{{ order.deliveryType === 'shipping' ? '📦 จัดส่งพัสดุ (' + (order.expressCompany || 'เอกชน') + ')' : '🏪 นัดรับหน้าร้าน' }}</span></div>
+                        <div><strong class="text-slate-600">สถานที่/ที่อยู่:</strong> <span class="text-slate-800 leading-relaxed">{{ order.location || '-' }}</span></div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+                        <div class="font-bold text-slate-900 border-b border-slate-200 pb-1 flex items-center gap-1.5 text-sm">
+                            <i class="fa-solid fa-calendar-days text-pink-600"></i>
+                            <span>กำหนดการและสถานะการเงิน</span>
+                        </div>
+                        <div><strong class="text-slate-600">วันที่สั่งซื้อ:</strong> <span class="text-slate-800">{{ formatDate(order.orderDate) }}</span></div>
+                        <div><strong class="text-slate-600">กำหนดส่ง/นัดรับ:</strong> <span class="text-rose-600 font-black text-sm">{{ formatDate(order.deliveryDate) }}</span></div>
+                        <div><strong class="text-slate-600">ยอดรวมสินค้า:</strong> <span class="text-slate-900 font-bold">฿{{ formatNumber(order.totalAmount) }}</span></div>
+                        <div><strong class="text-slate-600">ชำระแล้ว/มัดจำ:</strong> <span class="text-emerald-600 font-bold">฿{{ formatNumber(order.depositAmount) }}</span> <span class="text-slate-500 font-medium">(คงเหลือ: ฿{{ formatNumber(getRemainingBalance(order)) }})</span></div>
+                    </div>
+                </div>
+
+                <!-- Products Description Box -->
+                <div class="border-2 border-pink-200 bg-pink-50/30 rounded-xl p-3 mb-3 text-xs space-y-1.5">
+                    <div class="font-bold text-pink-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>รายการสินค้า & รายละเอียดช่อดอกไม้ที่ต้องจัด:</span>
+                    </div>
+                    <div class="whitespace-pre-line text-slate-900 text-sm font-semibold leading-relaxed bg-white p-2.5 rounded-lg border border-pink-100 min-h-[40px]">
+                        {{ order.products }}
+                    </div>
+                    <div v-if="order.notes" class="text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200 flex items-start gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
+                        <div><strong class="font-bold">หมายเหตุสำคัญจากลูกค้า:</strong> {{ order.notes }}</div>
+                    </div>
+                </div>
+
+                <!-- Image Box / Sample Preview -->
+                <div class="image-frame border-2 border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center bg-slate-50/50 mb-3 text-center">
+                    <div v-if="order.imageUrl" class="w-full h-full flex items-center justify-center overflow-hidden rounded-lg">
+                        <img :src="order.imageUrl" alt="Reference" class="max-h-[135mm] max-w-full object-contain" :style="{ transform: 'rotate(' + (order.imageRotation || 0) + 'deg)' }">
+                    </div>
+                    <div v-else class="text-slate-400 space-y-1 py-4">
+                        <i class="fa-regular fa-image text-3xl text-slate-300"></i>
+                        <p class="text-xs font-medium text-slate-500">พื้นที่สำหรับแนบรูปภาพตัวอย่างช่อดอกไม้ / แบบงานจริง</p>
+                    </div>
+                </div>
+
+                <!-- Footer Signatures -->
+                <div class="grid grid-cols-3 gap-6 pt-3 border-t-2 border-slate-300 text-xs text-center font-bold text-slate-700">
+                    <div class="border-t border-slate-400 pt-2">
+                        <div>ผู้รับออเดอร์ / จัดทำใบเสร็จ</div>
+                        <div class="text-[10px] text-slate-400 font-normal mt-0.5">(...........................................)</div>
+                    </div>
+                    <div class="border-t border-slate-400 pt-2">
+                        <div>ช่างจัดดอกไม้ / ผู้ผลิตชิ้นงาน</div>
+                        <div class="text-[10px] text-slate-400 font-normal mt-0.5">(...........................................)</div>
+                    </div>
+                    <div class="border-t border-slate-400 pt-2">
+                        <div>ผู้ตรวจสอบความเรียบร้อย / จัดส่ง</div>
+                        <div class="text-[10px] text-slate-400 font-normal mt-0.5">(...........................................)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm no-print">
+            <div class="bg-white sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-100 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] overflow-hidden sm:my-8 flex flex-col transform transition-all">
+                <div class="px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                    <h3 class="font-bold text-base sm:text-lg flex items-center gap-2">
+                        <i class="fa-solid text-pink-400" :class="isEditing ? 'fa-pen-to-square' : 'fa-circle-plus'"></i>
+                        {{ isEditing ? 'แก้ไขข้อมูลออเดอร์ & ใบสั่งงาน' : 'เพิ่มออเดอร์ลูกค้าใหม่ & ใบสั่งงาน' }}
+                    </h3>
+                    <button @click="closeModal" class="text-slate-400 hover:text-white transition-colors p-1">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <form @submit.prevent="saveOrder" class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
+                    <!-- Delivery Mode Selection -->
+                    <div class="p-3 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+                        <span class="text-xs font-bold text-slate-700">รูปแบบการจัดส่ง:</span>
+                        <div class="flex items-center gap-2">
+                            <label class="px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
+                                   :class="form.deliveryType === 'shipping' ? 'bg-sky-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-slate-50'">
+                                <input type="radio" v-model="form.deliveryType" value="shipping" class="hidden">
+                                <i class="fa-solid fa-truck-fast"></i>
+                                <span>📦 จัดส่งพัสดุ</span>
+                            </label>
+                            <label class="px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1.5"
+                                   :class="form.deliveryType === 'pickup' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-slate-50'">
+                                <input type="radio" v-model="form.deliveryType" value="pickup" class="hidden">
+                                <i class="fa-solid fa-store"></i>
+                                <span>🏪 นัดรับหน้าร้าน</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อลูกค้า <span class="text-rose-500">*</span></label>
+                            <input v-model="form.customerName" required type="text" placeholder="เช่น คุณสมชาย ใจดี" class="w-full px-3.5 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">คิวที่ / Queue No.</label>
+                            <input v-model="form.queueNo" type="text" placeholder="เช่น 01 หรือ A-01" class="w-full px-3.5 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm font-bold text-pink-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">เบอร์โทรศัพท์ <span class="text-rose-500">*</span></label>
+                            <input v-model="form.customerPhone" required type="tel" inputmode="tel" placeholder="เช่น 081-234-5678" class="w-full px-3.5 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">ประจำเดือน / ฤดูกาล</label>
+                            <input v-model="form.orderMonth" type="text" placeholder="เช่น มกราคม 2026 หรือ วาเลนไทน์" class="w-full px-3.5 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รายละเอียดสินค้า (สำหรับพิมพ์ใบสั่งงาน) <span class="text-rose-500">*</span></label>
+                        <textarea v-model="form.products" required rows="3" placeholder="ระบุรายละเอียดสินค้า ชนิดดอกไม้ โทนสี จำนวน..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุเพิ่มเติม</label>
+                        <input v-model="form.notes" type="text" placeholder="เช่น ห้ามใส่ดอกยิปโซสีฟ้า..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รูปภาพตัวอย่างช่อดอกไม้ / แบบงาน (สำหรับใบสั่งงาน)</label>
+
+                        <div v-if="!form.imageUrl" class="flex items-center justify-center px-4 pt-4 pb-4 border-2 border-slate-200 border-dashed rounded-xl hover:border-pink-400 transition-colors cursor-pointer bg-slate-50" @click="$refs.imageUploadInput.click()">
+                            <div class="space-y-1 text-center">
+                                <i class="fa-regular fa-image text-2xl text-slate-400"></i>
+                                <div class="text-xs text-slate-600">
+                                    <span class="font-medium text-pink-500">คลิกอัปโหลดรูปภาพ</span> หรือลากไฟล์มาวาง
+                                </div>
+                                <p class="text-[10px] text-slate-400">PNG, JPG, WEBP สูงสุด 10MB</p>
+                            </div>
+                        </div>
+
+                        <div v-else class="relative border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center" style="height: 160px;">
+                            <img :src="form.imageUrl" class="max-h-full max-w-full object-contain" :style="{ transform: 'rotate(' + (form.imageRotation || 0) + 'deg)' }">
+                            <div class="absolute top-2 right-2 bg-white/90 backdrop-blur-sm p-1.5 rounded-lg shadow border border-slate-200 flex gap-1">
+                                <button type="button" @click="rotateFormImage" title="หมุนรูป" class="p-1 hover:bg-slate-100 rounded text-slate-600">
+                                    <i class="fa-solid fa-rotate-right"></i>
+                                </button>
+                                <button type="button" @click="$refs.imageUploadInput.click()" title="เปลี่ยนรูป" class="p-1 hover:bg-slate-100 rounded text-slate-600">
+                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                </button>
+                                <button type="button" @click="removeFormImage" title="ลบรูป" class="p-1 hover:bg-red-50 rounded text-red-500">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <input ref="imageUploadInput" type="file" accept="image/*" class="hidden" @change="handleFormImageUpload">
+
+                        <details class="mt-1.5">
+                            <summary class="text-[11px] text-slate-400 cursor-pointer hover:text-slate-600">หรือใส่ลิงก์รูปภาพ (URL) แทน</summary>
+                            <input v-model="form.imageUrl" type="url" placeholder="https://example.com/flower-sample.jpg" class="w-full mt-1.5 px-3.5 py-2 border border-slate-200 rounded-xl text-sm">
+                        </details>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่สั่ง <span class="text-rose-500">*</span></label>
+                            <input v-model="form.orderDate" required type="date" class="w-full px-3.5 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">กำหนดจัดส่ง / นัดรับ <span class="text-rose-500">*</span></label>
+                            <input v-model="form.deliveryDate" required type="date" class="w-full px-3.5 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                    </div>
+
+                    <!-- SHIPPING MODE -->
+                    <div v-if="form.deliveryType === 'shipping'" class="bg-sky-50/70 p-4 rounded-xl border border-sky-200 space-y-3">
+                        <div class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                            <i class="fa-solid fa-box text-sky-600"></i>
+                            <span>รายละเอียดการจัดส่งพัสดุ</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">ที่อยู่จัดส่งพัสดุเต็ม <span class="text-rose-500">*</span></label>
+                            <textarea v-model="form.location" required rows="2" placeholder="ที่อยู่ผู้รับ..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm"></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">บริษัทขนส่ง</label>
+                                <select v-model="form.expressCompany" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm">
+                                    <option value="Flash Express">Flash Express</option>
+                                    <option value="J&T Express">J&T Express</option>
+                                    <option value="ไปรษณีย์ไทย (EMS)">ไปรษณีย์ไทย (EMS)</option>
+                                    <option value="Kerry Express">Kerry Express</option>
+                                    <option value="อื่นๆ">อื่นๆ</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">เลขพัสดุ (Tracking No.)</label>
+                                <input v-model="form.trackingNumber" type="text" inputmode="numeric" placeholder="ระบุเลขพัสดุ" class="w-full px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PICKUP MODE -->
+                    <div v-else-if="form.deliveryType === 'pickup'" class="bg-indigo-50/70 p-4 rounded-xl border border-indigo-200 space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">สถานที่นัดรับ / หน้าร้าน</label>
+                            <input v-model="form.location" type="text" placeholder="หน้าร้าน..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <label class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                                <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
+                                <span>ปักหมุดจุดนัดรับบนแผนที่</span>
+                            </label>
+                            <button type="button" @click="useCurrentLocation" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg shadow-2xs">
+                                <i class="fa-solid fa-crosshairs"></i> ตำแหน่งปัจจุบัน
+                            </button>
+                        </div>
+                        <div id="order-map" class="border border-indigo-200 shadow-inner"></div>
+                        <div class="grid grid-cols-2 gap-3 text-xs pt-1">
+                            <div>
+                                <span class="text-slate-500 block">Lat:</span>
+                                <input v-model.number="form.lat" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block">Lng:</span>
+                                <input v-model.number="form.lng" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Financial Details -->
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+                        <span class="text-xs font-bold text-slate-700 block">รายละเอียดการชำระเงิน</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">ยอดรวม (บาท)</label>
+                                <input v-model.number="form.totalAmount" min="0" type="number" inputmode="decimal" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">มัดจำ/ชำระแล้ว (บาท)</label>
+                                <input v-model.number="form.depositAmount" min="0" type="number" inputmode="decimal" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">ยอดคงเหลือ</label>
+                                <div class="w-full px-3 py-1.5 border border-slate-200 bg-slate-100 rounded-lg text-sm font-bold" :class="formRemainingAmount > 0 ? 'text-rose-600' : 'text-emerald-600'">
+                                    ฿{{ formatNumber(formRemainingAmount) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 sm:py-4 bg-white border-t border-slate-100 flex items-center gap-3">
+                        <button type="button" @click="closeModal" class="flex-1 sm:flex-initial px-4 py-3 sm:py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium rounded-xl text-sm">
+                            ยกเลิก
+                        </button>
+                        <button type="submit" class="flex-1 sm:flex-initial px-5 py-3 sm:py-2 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-xl text-sm shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>บันทึกออเดอร์</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div v-if="isStoreModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-sm no-print">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-store text-indigo-600"></i> ตั้งค่าตำแหน่งร้านค้า
+                    </h3>
+                    <button @click="isStoreModalOpen = false" class="text-slate-400 hover:text-slate-600 p-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อร้าน / สาขา</label>
+                    <input v-model="tempStore.name" type="text" class="w-full px-3 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm">
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-1.5 gap-2">
+                        <label class="text-xs font-semibold text-slate-700">ปักหมุดตำแหน่งร้านค้า</label>
+                        <button type="button" @click="useCurrentStoreLocation" class="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg shrink-0">
+                            ตำแหน่งปัจจุบัน
+                        </button>
+                    </div>
+                    <div id="store-map" class="border border-slate-200"></div>
+                </div>
+                <div class="pt-3 border-t flex justify-end gap-2">
+                    <button @click="isStoreModalOpen = false" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 text-slate-600 text-xs font-medium rounded-xl border border-slate-200">ยกเลิก</button>
+                    <button @click="saveStoreLocation" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 bg-indigo-600 text-white text-xs font-medium rounded-xl">บันทึก</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="receiptTarget" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto no-print">
+            <div class="bg-white sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-slate-200 w-full max-w-lg min-h-full sm:min-h-0 overflow-hidden sm:my-6">
+                <div class="p-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
+                    <h3 class="font-bold text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-receipt text-pink-400"></i> ใบเสร็จรับเงิน / สรุปรายการ
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <button @click="triggerPrintReceipt" class="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1">
+                            <i class="fa-solid fa-print"></i> พิมพ์
+                        </button>
+                        <button @click="receiptTarget = null" class="text-slate-400 hover:text-white p-1">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="printable-receipt" class="p-6 text-slate-800 space-y-4">
+                    <div class="text-center pb-4 border-b border-dashed border-slate-300">
+                        <h2 class="text-xl font-bold text-slate-900">🌸 S.FLOWER BLOOM</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">ใบเสร็จรับเงิน / ใบสั่งสินค้า</p>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-600">
+                        <div>
+                            <span class="block font-semibold text-slate-800">ลูกค้า: {{ receiptTarget.customerName }}</span>
+                            <span>โทร: {{ receiptTarget.customerPhone || '-' }}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="block font-semibold text-slate-800">เลขที่: #{{ receiptTarget.id.slice(-6) }}</span>
+                            <span>วันที่: {{ formatDate(receiptTarget.orderDate) }}</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+                        <div class="font-bold text-slate-700 mb-1">รายการสินค้า:</div>
+                        <div class="whitespace-pre-line text-slate-800 font-medium">{{ receiptTarget.products }}</div>
+                    </div>
+                    <div class="space-y-1.5 text-xs pt-1">
+                        <div class="flex justify-between">
+                            <span>ยอดรวมทั้งหมด:</span>
+                            <span class="font-semibold text-slate-800">฿{{ formatNumber(receiptTarget.totalAmount) }}</span>
+                        </div>
+                        <div class="flex justify-between text-emerald-600">
+                            <span>ชำระแล้ว:</span>
+                            <span class="font-semibold">฿{{ formatNumber(receiptTarget.depositAmount) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm font-bold pt-2 border-t border-slate-200" :class="getRemainingBalance(receiptTarget) > 0 ? 'text-rose-600' : 'text-emerald-600'">
+                            <span>ยอดคงเหลือ:</span>
+                            <span>฿{{ formatNumber(getRemainingBalance(receiptTarget)) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="toastMessage" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center justify-center sm:justify-start gap-3 transition-all animate-bounce no-print">
+            <i class="fa-solid fa-circle-check text-pink-400"></i>
+            <span class="text-sm font-medium">{{ toastMessage }}</span>
+        </div>
+
+        <!-- Delete Modal -->
+        <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm no-print">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md p-5 sm:p-6 text-center">
+                <div class="w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">ยืนยันการลบออเดอร์?</h3>
+                <p class="text-sm text-slate-500 mt-1">คุณต้องการลบออเดอร์ของ <strong>"{{ deleteTarget.customerName }}"</strong> ใช่หรือไม่?</p>
+                <div class="mt-6 flex items-center justify-center gap-3">
+                    <button @click="deleteTarget = null" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 border border-slate-200 text-slate-600 rounded-xl text-sm">ยกเลิก</button>
+                    <button @click="executeDelete" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 bg-rose-600 text-white rounded-xl text-sm">ยืนยันลบ</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+        createApp({
+            setup() {
+                const orders = ref([]);
+                const searchQuery = ref('');
+                const filterType = ref('all');
+                const statusFilter = ref('all');
+                const datePreset = ref('all');
+                const sortBy = ref('delivery_asc');
+                const currentView = ref('grid');
+                
+                const isModalOpen = ref(false);
+                const isStoreModalOpen = ref(false);
+                const isEditing = ref(false);
+                const editingId = ref(null);
+                const toastMessage = ref('');
+                const deleteTarget = ref(null);
+                const receiptTarget = ref(null);
+                const selectedForPrint = ref([]);
+                const ordersToPrint = ref([]);
+
+                const storeLocation = ref({
+                    name: 'S.FLOWER BLOOM (สาขาหลัก)',
+                    lat: 13.7563,
+                    lng: 100.5018
+                });
+
+                const tempStore = ref({ ...storeLocation.value });
+
+                const form = ref({
+                    customerName: '',
+                    customerPhone: '',
+                    queueNo: '01',
+                    orderMonth: 'กุมภาพันธ์ 2026',
+                    products: '',
+                    notes: '',
+                    imageUrl: '',
+                    imageRotation: 0,
+                    orderDate: new Date().toISOString().split('T')[0],
+                    deliveryDate: '',
+                    deliveryType: 'shipping',
+                    expressCompany: 'Flash Express',
+                    trackingNumber: '',
+                    location: '',
+                    lat: null,
+                    lng: null,
+                    totalAmount: 1500,
+                    depositAmount: 500,
+                    status: 'pending'
+                });
+
+                let orderMap = null;
+                let orderMarker = null;
+                let storeMap = null;
+                let storeMarker = null;
+
+                const getTodayString = (offsetDays = 0) => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + offsetDays);
+                    return d.toISOString().split('T')[0];
+                };
+
+                const initialOrders = [
+                    {
+                        id: 'ORD-' + Date.now() + '-1',
+                        customerName: 'คุณณัฐมน บุญมา',
+                        customerPhone: '089-123-4567',
+                        queueNo: '01',
+                        orderMonth: 'กุมภาพันธ์ 2026',
+                        products: 'ช่อดอกกุหลาบแดงพรีเมียม 9 ดอก โทนกระดาษสีดำขอบทอง',
+                        notes: 'ขอริบบิ้นสีแดงเข้ม',
+                        imageUrl: '',
+                        imageRotation: 0,
+                        orderDate: getTodayString(-1),
+                        deliveryDate: getTodayString(0),
+                        deliveryType: 'shipping',
+                        expressCompany: 'Flash Express',
+                        trackingNumber: 'TH0192837465',
+                        location: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตวัฒนา กรุงเทพฯ 10110',
+                        lat: null,
+                        lng: null,
+                        totalAmount: 1850,
+                        depositAmount: 1850,
+                        status: 'in_progress'
+                    },
+                    {
+                        id: 'ORD-' + Date.now() + '-2',
+                        customerName: 'คุณภัทรพล สุขเสริฐ',
+                        customerPhone: '081-999-8877',
+                        queueNo: '02',
+                        orderMonth: 'กุมภาพันธ์ 2026',
+                        products: 'ช่อดอกไม้แห้งขนาดใหญ่ โทนสีพาสเทล พร้อมการ์ดอวยพรวันเกิด',
+                        notes: 'ลูกค้ามารับเองหน้าร้าน',
+                        imageUrl: '',
+                        imageRotation: 0,
+                        orderDate: getTodayString(-2),
+                        deliveryDate: getTodayString(1),
+                        deliveryType: 'pickup',
+                        expressCompany: '',
+                        trackingNumber: '',
+                        location: 'หน้าร้านหลัก S.FLOWER BLOOM',
+                        lat: 13.7380,
+                        lng: 100.5600,
+                        totalAmount: 1200,
+                        depositAmount: 500,
+                        status: 'ready'
+                    }
+                ];
+
+                function calculateDistance(lat1, lon1, lat2, lon2) {
+                    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+                    const R = 6371;
+                    const dLat = (lat2 - lat1) * Math.PI / 180;
+                    const dLon = (lon2 - lon1) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    return Math.round(R * c * 10) / 10;
+                }
+
+                function getDistance(order) {
+                    if (order.deliveryType !== 'pickup') return null;
+                    return calculateDistance(storeLocation.value.lat, storeLocation.value.lng, order.lat, order.lng);
+                }
+
+                function getRemainingBalance(order) {
+                    if (!order) return 0;
+                    return Math.max(0, (Number(order.totalAmount) || 0) - (Number(order.depositAmount) || 0));
+                }
+
+                function getDeliveryUrgency(order) {
+                    if (!order || !order.deliveryDate || order.status === 'completed' || order.status === 'cancelled') {
+                        return { type: 'normal', text: '', cardClass: 'bg-white border-slate-200/90' };
+                    }
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    const delivery = new Date(order.deliveryDate); delivery.setHours(0, 0, 0, 0);
+                    const diffDays = Math.round((delivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+                    if (diffDays < 0) {
+                        return { type: 'overdue', text: `🚨 เกินกำหนด ${Math.abs(diffDays)} วัน!`, cardClass: 'bg-rose-50/80 border-rose-400 border-l-8 border-l-rose-600' };
+                    } else if (diffDays === 0) {
+                        return { type: 'today', text: '⚡️ กำหนดจัดส่ง / นัดรับวันนี้!', cardClass: 'bg-amber-50/80 border-amber-400 border-l-8 border-l-amber-500' };
+                    }
+                    return { type: 'normal', text: `อีก ${diffDays} วัน`, cardClass: 'bg-white border-slate-200/90' };
+                }
+
+                const pendingCount = computed(() => orders.value.filter(o => o.status === 'pending' || o.status === 'in_progress').length);
+                const pickupCount = computed(() => orders.value.filter(o => o.deliveryType === 'pickup').length);
+                const shippingCount = computed(() => orders.value.filter(o => o.deliveryType === 'shipping').length);
+                const totalDepositSum = computed(() => orders.value.reduce((sum, o) => sum + (Number(o.depositAmount) || 0), 0));
+                const totalRemainingSum = computed(() => orders.value.reduce((sum, o) => sum + getRemainingBalance(o), 0));
+                const formRemainingAmount = computed(() => Math.max(0, (Number(form.value.totalAmount) || 0) - (Number(form.value.depositAmount) || 0)));
+
+                const filteredOrders = computed(() => {
+                    const todayStr = getTodayString(0);
+                    const tomorrowStr = getTodayString(1);
+
+                    return orders.value.filter(order => {
+                        const q = searchQuery.value.toLowerCase().trim();
+                        const matchesSearch = !q || order.customerName.toLowerCase().includes(q) || order.products.toLowerCase().includes(q) || (order.customerPhone && order.customerPhone.includes(q)) || (order.trackingNumber && order.trackingNumber.toLowerCase().includes(q));
+                        let matchesFilter = filterType.value === 'all' || order.deliveryType === filterType.value;
+                        let matchesStatus = statusFilter.value === 'all' || order.status === statusFilter.value;
+                        let matchesDate = datePreset.value === 'all' || (datePreset.value === 'today' && order.deliveryDate === todayStr) || (datePreset.value === 'tomorrow' && order.deliveryDate === tomorrowStr) || (datePreset.value === 'overdue' && getDeliveryUrgency(order).type === 'overdue');
+                        return matchesSearch && matchesFilter && matchesStatus && matchesDate;
+                    }).sort((a, b) => {
+                        if (sortBy.value === 'delivery_asc') return (new Date(a.deliveryDate || 0)) - (new Date(b.deliveryDate || 0));
+                        if (sortBy.value === 'created_desc') return b.id.localeCompare(a.id);
+                        if (sortBy.value === 'remaining_desc') return getRemainingBalance(b) - getRemainingBalance(a);
+                        return 0;
+                    });
+                });
+
+                function formatNumber(num) { return new Intl.NumberFormat('th-TH').format(num || 0); }
+                function formatDate(dateStr) {
+                    if (!dateStr) return '-';
+                    return new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+                }
+
+                function getStatusClass(status) {
+                    switch (status) {
+                        case 'pending': return 'bg-amber-50 text-amber-800 border-amber-300';
+                        case 'in_progress': return 'bg-sky-50 text-sky-800 border-sky-300';
+                        case 'ready': return 'bg-indigo-50 text-indigo-800 border-indigo-300';
+                        case 'completed': return 'bg-emerald-50 text-emerald-800 border-emerald-300';
+                        case 'cancelled': return 'bg-slate-100 text-slate-500 border-slate-300';
+                        default: return 'bg-slate-50 text-slate-700 border-slate-200';
+                    }
+                }
+
+                function getProgressWidth(status) {
+                    return status === 'pending' ? 0 : status === 'in_progress' ? 33 : status === 'ready' ? 66 : 100;
+                }
+                function isStepActive(currentStatus, step) {
+                    const steps = ['pending', 'in_progress', 'ready', 'completed'];
+                    return steps.indexOf(step) <= steps.indexOf(currentStatus);
+                }
+                function getProgressColor(status) { return status === 'completed' ? 'bg-emerald-400' : 'bg-pink-400'; }
+                function getProgressDotColor(status) { return status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'bg-pink-500 border-pink-500'; }
+
+                function handleStatusChange(order, event) {
+                    order.status = event.target.value;
+                    saveToLocalStorage();
+                    showToast('อัปเดตสถานะเรียบร้อย');
+                }
+
+                function showToast(msg) {
+                    toastMessage.value = msg;
+                    setTimeout(() => { toastMessage.value = ''; }, 3000);
+                }
+
+                // Work Order Print Functions
+                function printSingleWorkOrder(order) {
+                    ordersToPrint.value = [order];
+                    nextTick(() => {
+                        window.print();
+                    });
+                }
+
+                function openBatchPrintModal() {
+                    if (selectedForPrint.value.length === 0) {
+                        showToast('กรุณาติ๊กเลือกออเดอร์ที่ต้องการพิมพ์ใบสั่งงานก่อนครับ');
+                        return;
+                    }
+                    ordersToPrint.value = orders.value.filter(o => selectedForPrint.value.includes(o.id));
+                    nextTick(() => {
+                        window.print();
+                    });
+                }
+
+                function openReceiptModal(order) { receiptTarget.value = order; }
+                function triggerPrintReceipt() { window.print(); }
+
+                function copyShippingAddress(order) {
+                    const text = `ชื่อผู้รับ: ${order.customerName}\nเบอร์โทร: ${order.customerPhone || '-'}\nที่อยู่จัดส่ง: ${order.location || '-'}`;
+                    const dummy = document.createElement("textarea");
+                    document.body.appendChild(dummy);
+                    dummy.value = text;
+                    dummy.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(dummy);
+                    showToast('คัดลอกที่อยู่จัดส่งพัสดุเรียบร้อย!');
+                }
+
+                // Leaflet Map Init
+                function initOrderMap(lat, lng) {
+                    nextTick(() => {
+                        const mapElem = document.getElementById('order-map');
+                        if (!mapElem) return;
+                        const defaultLat = lat || storeLocation.value.lat;
+                        const defaultLng = lng || storeLocation.value.lng;
+
+                        if (!orderMap) {
+                            orderMap = L.map('order-map').setView([defaultLat, defaultLng], 13);
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(orderMap);
+                            orderMap.on('click', (e) => { updateOrderCoords(e.latlng.lat, e.latlng.lng); });
+                        } else {
+                            orderMap.setView([defaultLat, defaultLng], 13);
+                            orderMap.invalidateSize();
+                        }
+                        if (orderMarker) orderMap.removeLayer(orderMarker);
+                        if (lat && lng) orderMarker = L.marker([lat, lng]).addTo(orderMap);
+                    });
+                }
+
+                function updateOrderCoords(lat, lng) {
+                    form.value.lat = Math.round(lat * 100000) / 100000;
+                    form.value.lng = Math.round(lng * 100000) / 100000;
+                    if (orderMap) {
+                        if (orderMarker) orderMap.removeLayer(orderMarker);
+                        orderMarker = L.marker([lat, lng]).addTo(orderMap);
+                        orderMap.panTo([lat, lng]);
+                    }
+                }
+
+                function useCurrentLocation() {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                            updateOrderCoords(pos.coords.latitude, pos.coords.longitude);
+                            showToast('ดึงพิกัดปัจจุบันสำเร็จ!');
+                        });
+                    }
+                }
+
+                watch(() => form.value.deliveryType, (newVal) => {
+                    if (newVal === 'pickup' && isModalOpen.value) {
+                        initOrderMap(form.value.lat, form.value.lng);
+                    }
+                });
+
+                function openModal(order = null) {
+                    if (order) {
+                        isEditing.value = true;
+                        editingId.value = order.id;
+                        form.value = { ...order };
+                    } else {
+                        isEditing.value = false;
+                        editingId.value = null;
+                        
+                        // Remember last customer phone/location or defaults to make entry faster
+                        const lastOrder = orders.value.length > 0 ? orders.value[0] : null;
+
+                        form.value = {
+                            customerName: '',
+                            customerPhone: '',
+                            queueNo: String(orders.value.length + 1).padStart(2, '0'),
+                            orderMonth: 'กุมภาพันธ์ 2026',
+                            products: 'ช่อกุหลาบแดงพรีเมียม โทนเกาหลี',
+                            notes: '',
+                            imageUrl: '',
+                            imageRotation: 0,
+                            orderDate: new Date().toISOString().split('T')[0],
+                            deliveryDate: getTodayString(1),
+                            deliveryType: lastOrder ? lastOrder.deliveryType : 'shipping',
+                            expressCompany: 'Flash Express',
+                            trackingNumber: '',
+                            location: lastOrder && lastOrder.deliveryType === 'pickup' ? lastOrder.location : '',
+                            lat: storeLocation.value.lat,
+                            lng: storeLocation.value.lng,
+                            totalAmount: 1290,
+                            depositAmount: 500,
+                            status: 'pending'
+                        };
+                    }
+                    isModalOpen.value = true;
+                    if (form.value.deliveryType === 'pickup') initOrderMap(form.value.lat, form.value.lng);
+                }
+
+                function closeModal() {
+                    isModalOpen.value = false;
+                    if (orderMap) { orderMap.remove(); orderMap = null; orderMarker = null; }
+                }
+
+                function openStoreModal() {
+                    tempStore.value = { ...storeLocation.value };
+                    isStoreModalOpen.value = true;
+                    nextTick(() => {
+                        if (!storeMap) {
+                            storeMap = L.map('store-map').setView([tempStore.value.lat, tempStore.value.lng], 13);
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(storeMap);
+                            storeMarker = L.marker([tempStore.value.lat, tempStore.value.lng]).addTo(storeMap);
+                            storeMap.on('click', (e) => {
+                                tempStore.value.lat = Math.round(e.latlng.lat * 100000) / 100000;
+                                tempStore.value.lng = Math.round(e.latlng.lng * 100000) / 100000;
+                                if (storeMarker) storeMap.removeLayer(storeMarker);
+                                storeMarker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(storeMap);
+                            });
+                        } else {
+                            storeMap.setView([tempStore.value.lat, tempStore.value.lng], 13);
+                            storeMap.invalidateSize();
+                        }
+                    });
+                }
+
+                function useCurrentStoreLocation() {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                            tempStore.value.lat = Math.round(pos.coords.latitude * 100000) / 100000;
+                            tempStore.value.lng = Math.round(pos.coords.longitude * 100000) / 100000;
+                            if (storeMap) {
+                                if (storeMarker) storeMap.removeLayer(storeMarker);
+                                storeMarker = L.marker([tempStore.value.lat, tempStore.value.lng]).addTo(storeMap);
+                                storeMap.panTo([tempStore.value.lat, tempStore.value.lng]);
+                            }
+                            showToast('ดึงพิกัดร้านค้าปัจจุบันสำเร็จ!');
+                        });
+                    }
+                }
+
+                function saveStoreLocation() {
+                    storeLocation.value = { ...tempStore.value };
+                    localStorage.setItem('my_store_location', JSON.stringify(storeLocation.value));
+                    isStoreModalOpen.value = false;
+                    showToast('บันทึกตำแหน่งร้านค้าเรียบร้อย');
+                }
+
+                function handleFormImageUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) {
+                        showToast('ไฟล์รูปภาพใหญ่เกิน 10MB');
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        form.value.imageUrl = e.target.result;
+                        form.value.imageRotation = 0;
+                    };
+                    reader.readAsDataURL(file);
+                    event.target.value = '';
+                }
+
+                function rotateFormImage() {
+                    form.value.imageRotation = ((form.value.imageRotation || 0) + 90) % 360;
+                }
+
+                function removeFormImage() {
+                    form.value.imageUrl = '';
+                    form.value.imageRotation = 0;
+                }
+
+                function saveOrder() {
+                    if (isEditing.value) {
+                        const index = orders.value.findIndex(o => o.id === editingId.value);
+                        if (index !== -1) orders.value[index] = { ...form.value, id: editingId.value };
+                        showToast('อัปเดตข้อมูลออเดอร์เรียบร้อย');
+                    } else {
+                        const newOrder = { ...form.value, id: 'ORD-' + Date.now() };
+                        orders.value.unshift(newOrder);
+                        showToast('สร้างออเดอร์ใหม่สำเร็จ');
+                    }
+                    saveToLocalStorage();
+                    closeModal();
+                }
+
+                function confirmDelete(order) { deleteTarget.value = order; }
+                function executeDelete() {
+                    if (deleteTarget.value) {
+                        orders.value = orders.value.filter(o => o.id !== deleteTarget.value.id);
+                        saveToLocalStorage();
+                        showToast('ลบออเดอร์เรียบร้อย');
+                        deleteTarget.value = null;
+                    }
+                }
+
+                function exportDataJSON() {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(orders.value, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `flower_orders_${new Date().toISOString().split('T')[0]}.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                    showToast('ส่งออกไฟล์ข้อมูลสำเร็จ');
+                }
+
+                function importDataJSON(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const imported = JSON.parse(e.target.result);
+                            if (Array.isArray(imported)) {
+                                orders.value = imported;
+                                saveToLocalStorage();
+                                showToast('นำเข้าข้อมูลสำเร็จ!');
+                            }
+                        } catch (err) { showToast('รูปแบบไฟล์ไม่ถูกต้อง'); }
+                    };
+                    reader.readAsText(file);
+                }
+
+                function saveToLocalStorage() {
+                    localStorage.setItem('flower_orders_data', JSON.stringify(orders.value));
+                }
+
+                onMounted(() => {
+                    const savedStore = localStorage.getItem('my_store_location');
+                    if (savedStore) { try { storeLocation.value = JSON.parse(savedStore); } catch (e) {} }
+
+                    const saved = localStorage.getItem('flower_orders_data');
+                    if (saved) {
+                        try { orders.value = JSON.parse(saved); } catch (e) { orders.value = initialOrders; }
+                    } else {
+                        orders.value = initialOrders;
+                        saveToLocalStorage();
+                    }
+                });
+
+                return {
+                    orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
+                    isModalOpen, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
+                    filteredOrders, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
+                    toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
+                    openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
+                    getRemainingBalance, getDeliveryUrgency, getDistance, formatNumber, formatDate, getStatusClass,
+                    getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange,
+                    printSingleWorkOrder, openBatchPrintModal, openReceiptModal, triggerPrintReceipt,
+                    copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
+                    handleFormImageUpload, rotateFormImage, removeFormImage
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
