@@ -14,6 +14,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Vue 3 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <!-- Firebase SDK (compat) สำหรับซิงค์ข้อมูลระหว่างเครื่อง -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
     <!-- Leaflet OpenStreetMap CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -955,6 +958,21 @@
     </div>
 
     <script>
+        // 🔥 ตั้งค่า Firebase ตรงนี้ — เอาค่ามาจาก Firebase Console
+        // Project settings (รูปเฟือง) > General > Your apps > SDK setup and configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAKFvEnppUTj2iW8UXsh4-fCnMBvtF1UP8",
+            authDomain: "sflowerbloomordermanager.firebaseapp.com",
+            databaseURL: "https://sflowerbloomordermanager-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "sflowerbloomordermanager",
+            storageBucket: "sflowerbloomordermanager.firebasestorage.app",
+            messagingSenderId: "135079797740",
+            appId: "1:135079797740:web:5d3113074955f0ce3c16c9"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
         createApp({
@@ -1155,8 +1173,10 @@
                 function getProgressDotColor(status) { return status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'bg-pink-500 border-pink-500'; }
 
                 function handleStatusChange(order, event) {
-                    order.status = event.target.value;
-                    saveToLocalStorage();
+                    const newStatus = event.target.value;
+                    order.status = newStatus;
+                    db.collection('orders').doc(order.id).update({ status: newStatus })
+                        .catch(() => showToast('อัปเดตสถานะไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     showToast('อัปเดตสถานะเรียบร้อย');
                 }
 
@@ -1325,7 +1345,8 @@
 
                 function saveStoreLocation() {
                     storeLocation.value = { ...tempStore.value };
-                    localStorage.setItem('my_store_location', JSON.stringify(storeLocation.value));
+                    db.collection('settings').doc('store').set(storeLocation.value)
+                        .catch(() => showToast('บันทึกตำแหน่งร้านไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     isStoreModalOpen.value = false;
                     showToast('บันทึกตำแหน่งร้านค้าเรียบร้อย');
                 }
@@ -1357,24 +1378,25 @@
 
                 function saveOrder() {
                     if (isEditing.value) {
-                        const index = orders.value.findIndex(o => o.id === editingId.value);
-                        if (index !== -1) orders.value[index] = { ...form.value, id: editingId.value };
-                        showToast('อัปเดตข้อมูลออเดอร์เรียบร้อย');
+                        const updated = { ...form.value, id: editingId.value };
+                        db.collection('orders').doc(editingId.value).set(updated)
+                            .then(() => showToast('อัปเดตข้อมูลออเดอร์เรียบร้อย'))
+                            .catch(() => showToast('บันทึกไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     } else {
                         const newOrder = { ...form.value, id: 'ORD-' + Date.now() };
-                        orders.value.unshift(newOrder);
-                        showToast('สร้างออเดอร์ใหม่สำเร็จ');
+                        db.collection('orders').doc(newOrder.id).set(newOrder)
+                            .then(() => showToast('สร้างออเดอร์ใหม่สำเร็จ'))
+                            .catch(() => showToast('บันทึกไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     }
-                    saveToLocalStorage();
                     closeModal();
                 }
 
                 function confirmDelete(order) { deleteTarget.value = order; }
                 function executeDelete() {
                     if (deleteTarget.value) {
-                        orders.value = orders.value.filter(o => o.id !== deleteTarget.value.id);
-                        saveToLocalStorage();
-                        showToast('ลบออเดอร์เรียบร้อย');
+                        db.collection('orders').doc(deleteTarget.value.id).delete()
+                            .then(() => showToast('ลบออเดอร์เรียบร้อย'))
+                            .catch(() => showToast('ลบไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                         deleteTarget.value = null;
                     }
                 }
@@ -1394,12 +1416,16 @@
                     const file = event.target.files[0];
                     if (!file) return;
                     const reader = new FileReader();
-                    reader.onload = (e) => {
+                    reader.onload = async (e) => {
                         try {
                             const imported = JSON.parse(e.target.result);
                             if (Array.isArray(imported)) {
-                                orders.value = imported;
-                                saveToLocalStorage();
+                                const batch = db.batch();
+                                imported.forEach(o => {
+                                    const id = o.id || ('ORD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6));
+                                    batch.set(db.collection('orders').doc(id), { ...o, id });
+                                });
+                                await batch.commit();
                                 showToast('นำเข้าข้อมูลสำเร็จ!');
                             }
                         } catch (err) { showToast('รูปแบบไฟล์ไม่ถูกต้อง'); }
@@ -1407,21 +1433,30 @@
                     reader.readAsText(file);
                 }
 
-                function saveToLocalStorage() {
-                    localStorage.setItem('flower_orders_data', JSON.stringify(orders.value));
-                }
-
+                let isFirstOrdersLoad = true;
                 onMounted(() => {
-                    const savedStore = localStorage.getItem('my_store_location');
-                    if (savedStore) { try { storeLocation.value = JSON.parse(savedStore); } catch (e) {} }
+                    // ตำแหน่งร้านค้า ซิงค์ผ่าน Firestore (เอกสารเดียว: settings/store)
+                    db.collection('settings').doc('store').onSnapshot((doc) => {
+                        if (doc.exists) {
+                            storeLocation.value = doc.data();
+                        } else {
+                            db.collection('settings').doc('store').set(storeLocation.value);
+                        }
+                    }, (err) => console.error('Firestore (settings) error:', err));
 
-                    const saved = localStorage.getItem('flower_orders_data');
-                    if (saved) {
-                        try { orders.value = JSON.parse(saved); } catch (e) { orders.value = initialOrders; }
-                    } else {
-                        orders.value = initialOrders;
-                        saveToLocalStorage();
-                    }
+                    // ออเดอร์ทั้งหมด ซิงค์แบบเรียลไทม์ระหว่างทุกเครื่องที่เปิดหน้านี้
+                    db.collection('orders').onSnapshot((snapshot) => {
+                        if (snapshot.empty && isFirstOrdersLoad) {
+                            // ฐานข้อมูลว่างในครั้งแรก ใส่ข้อมูลตัวอย่างเริ่มต้นให้
+                            initialOrders.forEach(o => db.collection('orders').doc(o.id).set(o));
+                        } else {
+                            orders.value = snapshot.docs.map(d => d.data());
+                        }
+                        isFirstOrdersLoad = false;
+                    }, (err) => {
+                        console.error('Firestore (orders) error:', err);
+                        showToast('เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจสอบ Firebase config');
+                    });
                 });
 
                 return {
