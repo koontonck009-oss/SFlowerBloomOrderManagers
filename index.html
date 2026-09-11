@@ -943,31 +943,45 @@
                     <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-comment-dots"></i> สร้างข้อความแจ้งลูกค้า
                     </h3>
-                    <button @click="closeMessageModal" class="text-white/80 hover:text-white transition-colors p-1">
+                    <button @click="closeMessageModal" class="text-white/80 hover:text-white transition-colors p-2 -mr-2">
                         <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Mobile-only tab switcher: form vs preview -->
+                <div class="md:hidden flex gap-1.5 p-3 pb-0 shrink-0">
+                    <button type="button" @click="messageMobileTab = 'form'"
+                            class="flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5"
+                            :class="messageMobileTab === 'form' ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-slate-600 border-slate-200'">
+                        <i class="fa-solid fa-pen-to-square"></i> กรอกข้อมูล
+                    </button>
+                    <button type="button" @click="messageMobileTab = 'preview'"
+                            class="flex-1 py-2.5 rounded-xl text-xs font-semibold border transition-colors flex items-center justify-center gap-1.5"
+                            :class="messageMobileTab === 'preview' ? 'bg-orange-500 text-white border-orange-500 shadow-sm' : 'bg-white text-slate-600 border-slate-200'">
+                        <i class="fa-solid fa-eye"></i> ดูตัวอย่าง
                     </button>
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                     <!-- Left: Form -->
-                    <div class="space-y-4">
+                    <div class="space-y-4" :class="messageMobileTab === 'form' ? '' : 'hidden md:block'">
                         <div>
                             <div class="flex items-center justify-between mb-2">
                                 <label class="text-xs font-bold text-slate-700">รายการสินค้า</label>
-                                <button type="button" @click="addMessageItem" class="text-xs px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-medium">
+                                <button type="button" @click="addMessageItem" class="text-xs px-3 py-2 sm:px-2.5 sm:py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-medium">
                                     <i class="fa-solid fa-plus"></i> เพิ่มสินค้า
                                 </button>
                             </div>
                             <div class="space-y-2">
                                 <div v-for="item in messageItems" :key="item.id" class="p-3 bg-amber-50 rounded-xl border border-amber-100 relative space-y-2">
-                                    <button v-if="messageItems.length > 1" type="button" @click="removeMessageItem(item.id)" class="absolute top-2 right-2 text-rose-400 hover:text-rose-600 text-xs p-1">
+                                    <button v-if="messageItems.length > 1" type="button" @click="removeMessageItem(item.id)" class="absolute top-1.5 right-1.5 text-rose-400 hover:text-rose-600 text-xs p-2">
                                         <i class="fa-solid fa-xmark"></i>
                                     </button>
-                                    <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า" class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
-                                    <div class="grid grid-cols-3 gap-2">
-                                        <input v-model.number="item.qty" type="number" placeholder="จำนวน" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
-                                        <input v-model="item.unit" type="text" placeholder="หน่วย" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
-                                        <input v-model.number="item.price" type="number" placeholder="ราคา/หน่วย" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs">
+                                    <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า" class="w-full pr-8 px-2.5 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs">
+                                    <div class="grid grid-cols-3 gap-1.5 sm:gap-2">
+                                        <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
+                                        <input v-model="item.unit" type="text" placeholder="หน่วย" class="px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
+                                        <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
                                     </div>
                                 </div>
                             </div>
@@ -976,28 +990,28 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xs font-bold text-slate-700 block mb-1">วิธีจัดส่ง</label>
-                                <select v-model="messageForm.shippingMethod" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <select v-model="messageForm.shippingMethod" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                                     <option value="shipping">📦 จัดส่งพัสดุ</option>
                                     <option value="pickup">🏠 นัดรับ</option>
                                 </select>
                             </div>
                             <div v-if="messageForm.shippingMethod === 'shipping'">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">ค่าจัดส่ง (บาท)</label>
-                                <input v-model.number="messageForm.shippingFee" type="number" placeholder="0" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <input v-model.number="messageForm.shippingFee" type="number" inputmode="decimal" placeholder="0" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
                             <div v-else>
                                 <label class="text-xs font-bold text-slate-700 block mb-1">สถานที่นัดรับ</label>
-                                <input v-model="messageForm.pickupLocation" type="text" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <input v-model="messageForm.pickupLocation" type="text" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
                             <div class="col-span-2">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">วันที่จัดส่ง/นัดรับ</label>
-                                <input v-model="messageForm.deliveryDateText" type="text" placeholder="เช่น 20 มกราคม" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <input v-model="messageForm.deliveryDateText" type="text" placeholder="เช่น 20 มกราคม" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
                         </div>
 
                         <div>
                             <label class="text-xs font-bold text-slate-700 block mb-1">รูปแบบการชำระเงิน</label>
-                            <select v-model="messageForm.paymentMode" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                            <select v-model="messageForm.paymentMode" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                                 <option value="default">💖 โอนเต็ม/มัดจำ</option>
                                 <option value="transfer_only">💰 โอนเท่านั้น</option>
                                 <option value="cod">🚚 เก็บเงินปลายทาง</option>
@@ -1007,24 +1021,32 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xs font-bold text-slate-700 block mb-1">{{ messageForm.paymentMode === 'cod' ? 'ยอดรวมที่ต้องเก็บ' : 'ยอดโอนเต็ม' }} (บาท)</label>
-                                <input v-model.number="messageForm.fullPay" type="number" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <input v-model.number="messageForm.fullPay" type="number" inputmode="decimal" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
                             <div v-if="messageForm.paymentMode === 'default'">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">ยอดมัดจำ (บาท)</label>
-                                <input v-model.number="messageForm.deposit" type="number" class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs">
+                                <input v-model.number="messageForm.deposit" type="number" inputmode="decimal" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
                         </div>
 
-                        <label class="flex items-center gap-2 text-xs font-medium text-orange-700 cursor-pointer">
-                            <input type="checkbox" v-model="messageForm.includeNote" class="rounded text-orange-500 w-4 h-4">
+                        <label class="flex items-center gap-2 text-xs font-medium text-orange-700 cursor-pointer py-1">
+                            <input type="checkbox" v-model="messageForm.includeNote" class="rounded text-orange-500 w-5 h-5 sm:w-4 sm:h-4">
                             แสดงหมายเหตุ (เรื่องการใส่การ์ด)
                         </label>
+
+                        <!-- Mobile: jump straight to preview after filling in the form -->
+                        <button type="button" @click="messageMobileTab = 'preview'" class="md:hidden w-full py-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-eye"></i> ดูตัวอย่างข้อความ
+                        </button>
                     </div>
 
                     <!-- Right: Preview -->
-                    <div class="flex flex-col">
+                    <div class="flex-col" :class="messageMobileTab === 'preview' ? 'flex' : 'hidden md:flex'">
                         <label class="text-xs font-bold text-slate-700 mb-2">ตัวอย่างข้อความ (แตะเพื่อเลือกทั้งหมด)</label>
                         <div @click="selectMessageText" class="flex-1 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm whitespace-pre-wrap text-slate-800 leading-relaxed min-h-[280px] cursor-pointer hover:bg-amber-100/70 transition-colors select-all" ref="messagePreviewEl">{{ generatedMessage }}</div>
+                        <button type="button" @click="messageMobileTab = 'form'" class="md:hidden w-full mt-3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-pen-to-square"></i> กลับไปแก้ไขข้อมูล
+                        </button>
                     </div>
                 </div>
 
@@ -1166,6 +1188,7 @@
                 const isLoggingIn = ref(false);
 
                 const isMessageModalOpen = ref(false);
+                const messageMobileTab = ref('form');
                 const messageItems = ref([{ id: Date.now(), details: '', qty: 1, unit: 'ช่อ', price: 0 }]);
                 const messageForm = ref({
                     shippingMethod: 'shipping',
@@ -1410,6 +1433,7 @@
                         includeNote: true
                     };
                     isMessageModalOpen.value = true;
+                    messageMobileTab.value = 'form';
                 }
 
                 function closeMessageModal() {
@@ -1917,7 +1941,7 @@
                     printSingleWorkOrder, openBatchPrintModal, openReceiptModal, triggerPrintReceipt,
                     copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
                     handleFormImageUpload, rotateFormImage, removeFormImage, isCompressingImage,
-                    isMessageModalOpen, messageItems, messageForm, generatedMessage,
+                    isMessageModalOpen, messageItems, messageForm, generatedMessage, messageMobileTab,
                     authChecked, isLoggedIn, loginForm, loginError, isLoggingIn, handleLogin, handleLogout,
                     openMessageModal, closeMessageModal, addMessageItem, removeMessageItem,
                     selectMessageText, copyMessageToClipboard
