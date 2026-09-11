@@ -17,6 +17,7 @@
     <!-- Firebase SDK (compat) สำหรับซิงค์ข้อมูลระหว่างเครื่อง -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
     <!-- Leaflet OpenStreetMap CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -129,6 +130,40 @@
 
     <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
 
+        <!-- Loading state while Firebase reports auth status -->
+        <div v-if="!authChecked" class="min-h-[80vh] flex items-center justify-center">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-pink-400"></i>
+        </div>
+
+        <!-- Login Screen -->
+        <div v-else-if="!isLoggedIn" class="min-h-[80vh] flex items-center justify-center px-4">
+            <div class="bg-white rounded-2xl shadow-lg border border-slate-200/80 p-8 w-full max-w-sm">
+                <div class="text-center mb-6">
+                    <div class="w-14 h-14 mx-auto rounded-xl bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-md shadow-pink-500/20 text-2xl font-bold mb-3">🌸</div>
+                    <h1 class="text-lg font-bold text-slate-900">S.FLOWER BLOOM</h1>
+                    <p class="text-xs text-slate-500">เข้าสู่ระบบจัดการออเดอร์</p>
+                </div>
+                <form @submit.prevent="handleLogin" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อผู้ใช้</label>
+                        <input v-model="loginForm.username" type="text" autocomplete="username" placeholder="admin" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รหัสผ่าน</label>
+                        <input v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="••••••" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-400">
+                    </div>
+                    <p v-if="loginError" class="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{{ loginError }}</p>
+                    <button type="submit" :disabled="isLoggingIn" class="w-full py-2.5 bg-pink-600 hover:bg-pink-700 disabled:opacity-60 text-white font-medium rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2">
+                        <i v-if="isLoggingIn" class="fa-solid fa-spinner fa-spin"></i>
+                        <span>{{ isLoggingIn ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ' }}</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main App (only rendered once logged in) -->
+        <div v-else>
+
         <!-- Header Bar & Dashboard -->
         <header class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 sm:p-5 mb-4 sm:mb-6 no-print">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -170,6 +205,10 @@
                             <span>Import</span>
                             <input type="file" @change="importDataJSON" accept=".json" class="hidden">
                         </label>
+                        <button @click="handleLogout" title="ออกจากระบบ" class="px-3 py-2.5 sm:py-2 bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-600 text-xs font-semibold rounded-xl transition-all flex items-center justify-center sm:justify-start gap-1.5">
+                            <i class="fa-solid fa-right-from-bracket text-slate-500"></i>
+                            <span>ออกจากระบบ</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1070,6 +1109,9 @@
             </div>
         </div>
 
+        </div>
+        <!-- /Main App -->
+
     </div>
 
     <script>
@@ -1086,6 +1128,12 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Login screen accepts a plain "admin" id, but the real password check happens
+        // on Firebase's servers (via this fixed account), not in this file's JS —
+        // so the password is never sitting in readable page source.
+        const ADMIN_LOGIN_EMAIL = 'admin@sflowerbloom.local';
 
         const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
@@ -1110,6 +1158,13 @@
                 const ordersToPrint = ref([]);
 
                 // Customer Notification Message Modal
+                // Login / Auth
+                const authChecked = ref(false);
+                const isLoggedIn = ref(false);
+                const loginForm = ref({ username: '', password: '' });
+                const loginError = ref('');
+                const isLoggingIn = ref(false);
+
                 const isMessageModalOpen = ref(false);
                 const messageItems = ref([{ id: Date.now(), details: '', qty: 1, unit: 'ช่อ', price: 0 }]);
                 const messageForm = ref({
@@ -1777,7 +1832,12 @@
                 }
 
                 let isFirstOrdersLoad = true;
-                onMounted(() => {
+                let listenersStarted = false;
+
+                function startFirestoreListeners() {
+                    if (listenersStarted) return;
+                    listenersStarted = true;
+
                     // ตำแหน่งร้านค้า ซิงค์ผ่าน Firestore (เอกสารเดียว: settings/store)
                     db.collection('settings').doc('store').onSnapshot((doc) => {
                         if (doc.exists) {
@@ -1800,6 +1860,50 @@
                         console.error('Firestore (orders) error:', err);
                         showToast('เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจสอบ Firebase config');
                     });
+                }
+
+                function handleLogin() {
+                    loginError.value = '';
+                    const username = (loginForm.value.username || '').trim().toLowerCase();
+                    if (username !== 'admin') {
+                        loginError.value = 'ไม่พบชื่อผู้ใช้นี้';
+                        return;
+                    }
+                    if (!loginForm.value.password) {
+                        loginError.value = 'กรุณากรอกรหัสผ่าน';
+                        return;
+                    }
+                    isLoggingIn.value = true;
+                    auth.signInWithEmailAndPassword(ADMIN_LOGIN_EMAIL, loginForm.value.password)
+                        .catch((err) => {
+                            if (['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(err.code)) {
+                                loginError.value = 'รหัสผ่านไม่ถูกต้อง';
+                            } else if (err.code === 'auth/user-not-found') {
+                                loginError.value = 'ยังไม่ได้ตั้งค่าบัญชีนี้ใน Firebase Console';
+                            } else if (err.code === 'auth/too-many-requests') {
+                                loginError.value = 'ลองผิดพลาดหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่';
+                            } else if (err.code === 'auth/operation-not-allowed') {
+                                loginError.value = 'ยังไม่ได้เปิดใช้ระบบ Email/Password ใน Firebase Console';
+                            } else {
+                                loginError.value = 'เข้าสู่ระบบไม่สำเร็จ: ' + err.message;
+                            }
+                        })
+                        .finally(() => { isLoggingIn.value = false; });
+                }
+
+                function handleLogout() {
+                    auth.signOut();
+                    loginForm.value = { username: '', password: '' };
+                }
+
+                onMounted(() => {
+                    auth.onAuthStateChanged((user) => {
+                        isLoggedIn.value = !!user;
+                        authChecked.value = true;
+                        if (user) {
+                            startFirestoreListeners();
+                        }
+                    });
                 });
 
                 return {
@@ -1814,6 +1918,7 @@
                     copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
                     handleFormImageUpload, rotateFormImage, removeFormImage, isCompressingImage,
                     isMessageModalOpen, messageItems, messageForm, generatedMessage,
+                    authChecked, isLoggedIn, loginForm, loginError, isLoggingIn, handleLogin, handleLogout,
                     openMessageModal, closeMessageModal, addMessageItem, removeMessageItem,
                     selectMessageText, copyMessageToClipboard
                 };
