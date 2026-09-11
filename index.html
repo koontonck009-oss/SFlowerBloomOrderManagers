@@ -987,6 +987,20 @@
                             </div>
                         </div>
 
+                        <!-- Total mismatch warning: catches unfilled item prices and double-counted shipping -->
+                        <div v-if="messageTotalMismatch" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-2">
+                            <div class="flex items-start gap-2">
+                                <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                                <div>
+                                    ยอดจากรายการ+ค่าส่ง = <strong>฿{{ formatNumber(messageTotalMismatch.current) }}</strong>
+                                    ไม่ตรงกับยอดเดิมของออเดอร์ (฿{{ formatNumber(messageTotalMismatch.orig) }}) — ตรวจสอบราคาต่อชิ้นและค่าส่งก่อนคัดลอกข้อความ
+                                </div>
+                            </div>
+                            <button type="button" @click="useComputedTotalAsFullPay" class="text-xs px-2.5 py-1.5 bg-white hover:bg-amber-100 border border-amber-300 rounded-lg font-medium text-amber-800">
+                                ใช้ ฿{{ formatNumber(messageTotalMismatch.current) }} เป็นยอดโอนเต็ม
+                            </button>
+                        </div>
+
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xs font-bold text-slate-700 block mb-1">วิธีจัดส่ง</label>
@@ -1050,7 +1064,10 @@
                     </div>
                 </div>
 
-                <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end shrink-0">
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 shrink-0">
+                    <button @click="saveMessageTotalsToOrder" title="อัปเดตรายการสินค้าและยอดรวมในออเดอร์ให้ตรงกับที่กรอกไว้ในนี้" class="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-medium rounded-xl text-sm flex items-center justify-center gap-2 transition-all">
+                        <i class="fa-solid fa-floppy-disk"></i> บันทึกรายการ/ยอดนี้กลับเข้าออเดอร์
+                    </button>
                     <button @click="copyMessageToClipboard" class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95">
                         <i class="fa-solid fa-copy"></i> คัดลอกข้อความ
                     </button>
@@ -1189,6 +1206,7 @@
 
                 const isMessageModalOpen = ref(false);
                 const messageMobileTab = ref('form');
+                const messageSourceOrder = ref(null);
                 const messageItems = ref([{ id: Date.now(), details: '', qty: 1, unit: 'ช่อ', price: 0 }]);
                 const messageForm = ref({
                     shippingMethod: 'shipping',
@@ -1415,13 +1433,30 @@
 
                 // Customer Notification Message Functions
                 function openMessageModal(order) {
-                    messageItems.value = [{
-                        id: Date.now(),
-                        details: order.products || '',
-                        qty: 1,
-                        unit: 'ช่อ',
-                        price: order.totalAmount || 0
-                    }];
+                    messageSourceOrder.value = order;
+
+                    const lines = (order.products || '').split('\n').map(l => l.trim()).filter(Boolean);
+                    if (lines.length > 1) {
+                        // Multiple lines in the order's product description → one item row per line,
+                        // price left blank for staff to fill in per item (can't guess how the total splits)
+                        messageItems.value = lines.map((line, idx) => ({
+                            id: Date.now() + idx,
+                            details: line,
+                            qty: 1,
+                            unit: 'ช่อ',
+                            price: 0
+                        }));
+                    } else {
+                        // Single line (or empty) → keep the convenient default of using the order's total as-is
+                        messageItems.value = [{
+                            id: Date.now(),
+                            details: lines[0] || order.products || '',
+                            qty: 1,
+                            unit: 'ช่อ',
+                            price: order.totalAmount || 0
+                        }];
+                    }
+
                     messageForm.value = {
                         shippingMethod: order.deliveryType === 'pickup' ? 'pickup' : 'shipping',
                         shippingFee: 0,
@@ -1438,6 +1473,7 @@
 
                 function closeMessageModal() {
                     isMessageModalOpen.value = false;
+                    messageSourceOrder.value = null;
                 }
 
                 function addMessageItem() {
@@ -1454,6 +1490,45 @@
                     const fee = messageForm.value.shippingMethod === 'shipping' ? (Number(messageForm.value.shippingFee) || 0) : 0;
                     return subtotal + fee;
                 });
+
+                // Flags a mismatch between the itemized total (items + shipping) and the order's
+                // original totalAmount — most often a sign of shipping being double-counted or an
+                // item price left unfilled. null when there's nothing to compare or they already match.
+                const messageTotalMismatch = computed(() => {
+                    if (!messageSourceOrder.value) return null;
+                    const orig = Number(messageSourceOrder.value.totalAmount) || 0;
+                    const current = messageTotal.value;
+                    if (current === orig) return null;
+                    return { orig, current };
+                });
+
+                function useComputedTotalAsFullPay() {
+                    messageForm.value.fullPay = messageTotal.value;
+                }
+
+                async function saveMessageTotalsToOrder() {
+                    if (!messageSourceOrder.value || !messageSourceOrder.value.id) return;
+                    const newProducts = messageItems.value
+                        .map(item => {
+                            const label = (item.details || '').trim();
+                            if (!label) return null;
+                            const qty = Number(item.qty) || 0;
+                            return qty > 1 ? `${label} (x${qty} ${item.unit || ''})`.trim() : label;
+                        })
+                        .filter(Boolean)
+                        .join('\n');
+
+                    try {
+                        await db.collection('orders').doc(messageSourceOrder.value.id).update({
+                            products: newProducts || messageSourceOrder.value.products,
+                            totalAmount: messageTotal.value
+                        });
+                        showToast('บันทึกรายการ/ยอดรวมกลับเข้าออเดอร์แล้ว ✅');
+                    } catch (err) {
+                        console.error('Save totals to order error:', err);
+                        showToast('บันทึกไม่สำเร็จ ตรวจสอบการเชื่อมต่อ');
+                    }
+                }
 
                 watch(() => messageForm.value.paymentMode, (mode) => {
                     if (mode === 'cod') {
@@ -1942,6 +2017,7 @@
                     copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
                     handleFormImageUpload, rotateFormImage, removeFormImage, isCompressingImage,
                     isMessageModalOpen, messageItems, messageForm, generatedMessage, messageMobileTab,
+                    messageSourceOrder, messageTotalMismatch, useComputedTotalAsFullPay, saveMessageTotalsToOrder,
                     authChecked, isLoggedIn, loginForm, loginError, isLoggingIn, handleLogin, handleLogout,
                     openMessageModal, closeMessageModal, addMessageItem, removeMessageItem,
                     selectMessageText, copyMessageToClipboard
