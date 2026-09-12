@@ -752,8 +752,39 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">รายละเอียดสินค้า (สำหรับพิมพ์ใบสั่งงาน) <span class="text-rose-500">*</span></label>
-                        <textarea v-model="form.products" required rows="3" placeholder="ระบุรายละเอียดสินค้า ชนิดดอกไม้ โทนสี จำนวน..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"></textarea>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-semibold text-slate-700">รายละเอียดสินค้า (สำหรับพิมพ์ใบสั่งงาน) <span class="text-rose-500">*</span></label>
+                            <button type="button" @click="toggleFormItemizedMode" class="text-[11px] px-2 py-1 rounded-lg font-medium border transition-colors"
+                                    :class="formItemizedMode ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'">
+                                <i class="fa-solid" :class="formItemizedMode ? 'fa-check' : 'fa-list-ul'"></i>
+                                แยกราคารายชิ้น
+                            </button>
+                        </div>
+
+                        <textarea v-if="!formItemizedMode" v-model="form.products" required rows="3" placeholder="ระบุรายละเอียดสินค้า ชนิดดอกไม้ โทนสี จำนวน..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"></textarea>
+
+                        <div v-else class="space-y-2">
+                            <div v-for="item in form.items" :key="item.id" class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 relative space-y-2">
+                                <button v-if="form.items.length > 1" type="button" @click="removeFormItem(item.id)" class="absolute top-1.5 right-1.5 text-rose-400 hover:text-rose-600 text-xs p-2">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                                <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า เช่น ช่อกุหลาบแดง 9 ดอก" class="w-full pr-8 px-2.5 py-2 border border-slate-200 rounded-lg text-sm">
+                                <div class="grid grid-cols-3 gap-2">
+                                    <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                                    <input v-model="item.unit" type="text" placeholder="หน่วย" class="px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                                    <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 pt-1">
+                                <button type="button" @click="addFormItem" class="text-xs px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-medium">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มสินค้า
+                                </button>
+                                <span class="text-xs font-bold text-slate-600">
+                                    รวมสินค้า ฿{{ formatNumber(formItemsTotal) }}<span v-if="form.deliveryType === 'shipping' && form.shippingFee"> + ค่าส่ง ฿{{ formatNumber(form.shippingFee) }}</span> = ฿{{ formatNumber(formItemsGrandTotal) }}
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">ยอดรวม (รวมค่าส่งแล้ว) และรายละเอียดสินค้าจะถูกคำนวณ/สร้างให้อัตโนมัติจากรายการนี้ตอนบันทึกออเดอร์</p>
+                        </div>
                     </div>
 
                     <div>
@@ -841,6 +872,11 @@
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">เลขพัสดุ (Tracking No.)</label>
                                 <input v-model="form.trackingNumber" type="text" inputmode="numeric" placeholder="ระบุเลขพัสดุ" class="w-full px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono">
                             </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">ค่าจัดส่ง (บาท)</label>
+                                <input v-model.number="form.shippingFee" min="0" type="number" inputmode="decimal" placeholder="0" class="w-full px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-xl text-sm">
+                                <p class="text-[10px] text-slate-400 mt-1">{{ formItemizedMode ? 'รวมเข้ายอดรวมด้านล่างให้อัตโนมัติ' : 'ถ้ากรอกยอดรวมเองด้านล่าง อย่าลืมรวมค่าส่งไว้ด้วย' }}</p>
+                            </div>
                         </div>
                     </div>
 
@@ -875,10 +911,23 @@
                     <!-- Financial Details -->
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
                         <span class="text-xs font-bold text-slate-700 block">รายละเอียดการชำระเงิน</span>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">รูปแบบการชำระเงิน (สำหรับข้อความแจ้งลูกค้า)</label>
+                            <select v-model="form.paymentMode" class="w-full px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <option value="default">💖 โอนเต็ม/มัดจำ (ให้ลูกค้าเลือกได้)</option>
+                                <option value="transfer_only">💰 โอนเต็มจำนวนเท่านั้น</option>
+                                <option value="cod">🚚 เก็บเงินปลายทาง</option>
+                            </select>
+                        </div>
+
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">ยอดรวม (บาท)</label>
-                                <input v-model.number="form.totalAmount" min="0" type="number" inputmode="decimal" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <input v-if="!formItemizedMode" v-model.number="form.totalAmount" min="0" type="number" inputmode="decimal" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                                <div v-else class="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-lg text-sm font-bold text-slate-700" title="คำนวณจากรายการสินค้าด้านบน">
+                                    ฿{{ formatNumber(formItemsGrandTotal) }}
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">มัดจำ/ชำระแล้ว (บาท)</label>
@@ -1233,6 +1282,7 @@
                     queueNo: '01',
                     orderMonth: 'กุมภาพันธ์ 2026',
                     products: '',
+                    items: [],
                     notes: '',
                     imageUrl: '',
                     imageRotation: 0,
@@ -1241,13 +1291,16 @@
                     deliveryType: 'shipping',
                     expressCompany: 'Flash Express',
                     trackingNumber: '',
+                    shippingFee: 0,
                     location: '',
                     lat: null,
                     lng: null,
                     totalAmount: 1500,
                     depositAmount: 500,
+                    paymentMode: 'default',
                     status: 'pending'
                 });
+                const formItemizedMode = ref(false);
 
                 let orderMap = null;
                 let orderMarker = null;
@@ -1268,6 +1321,7 @@
                         queueNo: '01',
                         orderMonth: 'กุมภาพันธ์ 2026',
                         products: 'ช่อดอกกุหลาบแดงพรีเมียม 9 ดอก โทนกระดาษสีดำขอบทอง',
+                        items: [],
                         notes: 'ขอริบบิ้นสีแดงเข้ม',
                         imageUrl: '',
                         imageRotation: 0,
@@ -1276,11 +1330,13 @@
                         deliveryType: 'shipping',
                         expressCompany: 'Flash Express',
                         trackingNumber: 'TH0192837465',
+                        shippingFee: 50,
                         location: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตวัฒนา กรุงเทพฯ 10110',
                         lat: null,
                         lng: null,
                         totalAmount: 1850,
                         depositAmount: 1850,
+                        paymentMode: 'transfer_only',
                         status: 'in_progress'
                     },
                     {
@@ -1290,6 +1346,7 @@
                         queueNo: '02',
                         orderMonth: 'กุมภาพันธ์ 2026',
                         products: 'ช่อดอกไม้แห้งขนาดใหญ่ โทนสีพาสเทล พร้อมการ์ดอวยพรวันเกิด',
+                        items: [],
                         notes: 'ลูกค้ามารับเองหน้าร้าน',
                         imageUrl: '',
                         imageRotation: 0,
@@ -1298,11 +1355,13 @@
                         deliveryType: 'pickup',
                         expressCompany: '',
                         trackingNumber: '',
+                        shippingFee: 0,
                         location: 'หน้าร้านหลัก S.FLOWER BLOOM',
                         lat: 13.7380,
                         lng: 100.5600,
                         totalAmount: 1200,
                         depositAmount: 500,
+                        paymentMode: 'default',
                         status: 'ready'
                     }
                 ];
@@ -1348,7 +1407,36 @@
                 const shippingCount = computed(() => orders.value.filter(o => o.deliveryType === 'shipping').length);
                 const totalDepositSum = computed(() => orders.value.reduce((sum, o) => sum + (Number(o.depositAmount) || 0), 0));
                 const totalRemainingSum = computed(() => orders.value.reduce((sum, o) => sum + getRemainingBalance(o), 0));
-                const formRemainingAmount = computed(() => Math.max(0, (Number(form.value.totalAmount) || 0) - (Number(form.value.depositAmount) || 0)));
+                const formRemainingAmount = computed(() => {
+                    const total = formItemizedMode.value ? formItemsGrandTotal.value : (Number(form.value.totalAmount) || 0);
+                    return Math.max(0, total - (Number(form.value.depositAmount) || 0));
+                });
+
+                const formItemsTotal = computed(() => {
+                    return (form.value.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.price) || 0), 0);
+                });
+
+                const formItemsGrandTotal = computed(() => {
+                    const shippingFee = form.value.deliveryType === 'shipping' ? (Number(form.value.shippingFee) || 0) : 0;
+                    return formItemsTotal.value + shippingFee;
+                });
+
+                function toggleFormItemizedMode() {
+                    formItemizedMode.value = !formItemizedMode.value;
+                    if (formItemizedMode.value && (!form.value.items || form.value.items.length === 0)) {
+                        // Seed with one row from whatever's already in the free-text products field
+                        form.value.items = [{ id: Date.now(), details: form.value.products || '', qty: 1, unit: 'ช่อ', price: form.value.totalAmount || 0 }];
+                    }
+                }
+
+                function addFormItem() {
+                    form.value.items.push({ id: Date.now() + Math.random(), details: '', qty: 1, unit: 'ช่อ', price: 0 });
+                }
+
+                function removeFormItem(id) {
+                    if (form.value.items.length <= 1) return;
+                    form.value.items = form.value.items.filter(i => i.id !== id);
+                }
 
                 const filteredOrders = computed(() => {
                     const todayStr = getTodayString(0);
@@ -1435,34 +1523,45 @@
                 function openMessageModal(order) {
                     messageSourceOrder.value = order;
 
-                    const lines = (order.products || '').split('\n').map(l => l.trim()).filter(Boolean);
-                    if (lines.length > 1) {
-                        // Multiple lines in the order's product description → one item row per line,
-                        // price left blank for staff to fill in per item (can't guess how the total splits)
-                        messageItems.value = lines.map((line, idx) => ({
+                    if (order.items && order.items.length > 0) {
+                        // Order already has a proper itemized breakdown set at creation time — use it as-is
+                        messageItems.value = order.items.map((item, idx) => ({
                             id: Date.now() + idx,
-                            details: line,
-                            qty: 1,
-                            unit: 'ช่อ',
-                            price: 0
+                            details: item.details || '',
+                            qty: item.qty || 1,
+                            unit: item.unit || 'ช่อ',
+                            price: item.price || 0
                         }));
                     } else {
-                        // Single line (or empty) → keep the convenient default of using the order's total as-is
-                        messageItems.value = [{
-                            id: Date.now(),
-                            details: lines[0] || order.products || '',
-                            qty: 1,
-                            unit: 'ช่อ',
-                            price: order.totalAmount || 0
-                        }];
+                        const lines = (order.products || '').split('\n').map(l => l.trim()).filter(Boolean);
+                        if (lines.length > 1) {
+                            // Multiple lines in the order's product description → one item row per line,
+                            // price left blank for staff to fill in per item (can't guess how the total splits)
+                            messageItems.value = lines.map((line, idx) => ({
+                                id: Date.now() + idx,
+                                details: line,
+                                qty: 1,
+                                unit: 'ช่อ',
+                                price: 0
+                            }));
+                        } else {
+                            // Single line (or empty) → keep the convenient default of using the order's total as-is
+                            messageItems.value = [{
+                                id: Date.now(),
+                                details: lines[0] || order.products || '',
+                                qty: 1,
+                                unit: 'ช่อ',
+                                price: order.totalAmount || 0
+                            }];
+                        }
                     }
 
                     messageForm.value = {
                         shippingMethod: order.deliveryType === 'pickup' ? 'pickup' : 'shipping',
-                        shippingFee: 0,
+                        shippingFee: order.shippingFee || 0,
                         pickupLocation: order.deliveryType === 'pickup' ? (order.location || '') : '',
                         deliveryDateText: order.deliveryDate ? formatDate(order.deliveryDate) : '',
-                        paymentMode: 'default',
+                        paymentMode: order.paymentMode || 'default',
                         fullPay: order.totalAmount || 0,
                         deposit: order.depositAmount || 0,
                         includeNote: true
@@ -1518,10 +1617,17 @@
                         .filter(Boolean)
                         .join('\n');
 
+                    const itemsToSave = messageItems.value
+                        .filter(item => (item.details || '').trim())
+                        .map(item => ({ details: item.details, qty: Number(item.qty) || 0, unit: item.unit || '', price: Number(item.price) || 0 }));
+
                     try {
                         await db.collection('orders').doc(messageSourceOrder.value.id).update({
                             products: newProducts || messageSourceOrder.value.products,
-                            totalAmount: messageTotal.value
+                            items: itemsToSave,
+                            totalAmount: messageTotal.value,
+                            shippingFee: messageForm.value.shippingMethod === 'shipping' ? (Number(messageForm.value.shippingFee) || 0) : 0,
+                            paymentMode: messageForm.value.paymentMode
                         });
                         showToast('บันทึกรายการ/ยอดรวมกลับเข้าออเดอร์แล้ว ✅');
                     } catch (err) {
@@ -1678,10 +1784,12 @@
                     if (order) {
                         isEditing.value = true;
                         editingId.value = order.id;
-                        form.value = { ...order };
+                        form.value = { ...order, items: (order.items && order.items.length ? order.items.map(i => ({ ...i })) : []) };
+                        formItemizedMode.value = !!(order.items && order.items.length > 0);
                     } else {
                         isEditing.value = false;
                         editingId.value = null;
+                        formItemizedMode.value = false;
                         
                         // Remember last customer phone/location or defaults to make entry faster
                         const lastOrder = orders.value.length > 0 ? orders.value[0] : null;
@@ -1692,6 +1800,7 @@
                             queueNo: String(orders.value.length + 1).padStart(2, '0'),
                             orderMonth: 'กุมภาพันธ์ 2026',
                             products: 'ช่อกุหลาบแดงพรีเมียม โทนเกาหลี',
+                            items: [],
                             notes: '',
                             imageUrl: '',
                             imageRotation: 0,
@@ -1700,11 +1809,13 @@
                             deliveryType: lastOrder ? lastOrder.deliveryType : 'shipping',
                             expressCompany: 'Flash Express',
                             trackingNumber: '',
+                            shippingFee: lastOrder ? (lastOrder.shippingFee || 0) : 0,
                             location: lastOrder && lastOrder.deliveryType === 'pickup' ? lastOrder.location : '',
                             lat: storeLocation.value.lat,
                             lng: storeLocation.value.lng,
                             totalAmount: 1290,
                             depositAmount: 500,
+                            paymentMode: lastOrder ? (lastOrder.paymentMode || 'default') : 'default',
                             status: 'pending'
                         };
                     }
@@ -1874,6 +1985,22 @@
                 }
 
                 function saveOrder() {
+                    if (formItemizedMode.value && form.value.items && form.value.items.length > 0) {
+                        // Itemized mode: products text + totalAmount are derived from the item rows (+ shipping fee)
+                        form.value.products = form.value.items
+                            .map(item => {
+                                const label = (item.details || '').trim();
+                                if (!label) return null;
+                                const qty = Number(item.qty) || 0;
+                                return qty > 1 ? `${label} (x${qty} ${item.unit || ''})`.trim() : label;
+                            })
+                            .filter(Boolean)
+                            .join('\n') || form.value.products;
+                        form.value.totalAmount = formItemsGrandTotal.value;
+                    } else {
+                        form.value.items = [];
+                    }
+
                     if (isEditing.value) {
                         const updated = { ...form.value, id: editingId.value };
                         db.collection('orders').doc(editingId.value).set(updated)
@@ -2008,6 +2135,7 @@
                 return {
                     orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
                     isModalOpen, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
+                    formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
                     filteredOrders, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
                     openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
