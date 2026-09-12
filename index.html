@@ -43,6 +43,10 @@
         }
     </script>
     <style>
+        html, body {
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
         body {
             font-family: 'Prompt', 'Sarabun', sans-serif;
             background-color: #f8fafc;
@@ -986,7 +990,7 @@
         </div>
 
         <!-- Customer Notification Message Modal -->
-        <div v-if="isMessageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto no-print">
+        <div v-if="isMessageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto overflow-x-hidden no-print">
             <div class="bg-white sm:rounded-2xl shadow-xl w-full sm:max-w-4xl min-h-screen sm:min-h-0 sm:max-h-[92vh] flex flex-col overflow-x-hidden">
                 <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-amber-500 to-orange-500 shrink-0">
                     <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
