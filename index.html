@@ -769,10 +769,10 @@
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                                 <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า เช่น ช่อกุหลาบแดง 9 ดอก" class="w-full pr-8 px-2.5 py-2 border border-slate-200 rounded-lg text-sm">
-                                <div class="grid grid-cols-3 gap-2">
-                                    <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
-                                    <input v-model="item.unit" type="text" placeholder="หน่วย" class="px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
-                                    <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                                    <input v-model="item.unit" type="text" placeholder="หน่วย" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                                    <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="w-full col-span-2 sm:col-span-1 px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
                                 </div>
                             </div>
                             <div class="flex items-center justify-between gap-2 pt-1">
@@ -987,7 +987,7 @@
 
         <!-- Customer Notification Message Modal -->
         <div v-if="isMessageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto no-print">
-            <div class="bg-white sm:rounded-2xl shadow-xl w-full sm:max-w-4xl min-h-screen sm:min-h-0 sm:max-h-[92vh] flex flex-col">
+            <div class="bg-white sm:rounded-2xl shadow-xl w-full sm:max-w-4xl min-h-screen sm:min-h-0 sm:max-h-[92vh] flex flex-col overflow-x-hidden">
                 <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-amber-500 to-orange-500 shrink-0">
                     <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-comment-dots"></i> สร้างข้อความแจ้งลูกค้า
@@ -1027,10 +1027,10 @@
                                         <i class="fa-solid fa-xmark"></i>
                                     </button>
                                     <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า" class="w-full pr-8 px-2.5 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs">
-                                    <div class="grid grid-cols-3 gap-1.5 sm:gap-2">
-                                        <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
-                                        <input v-model="item.unit" type="text" placeholder="หน่วย" class="px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
-                                        <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                                        <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="w-full px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
+                                        <input v-model="item.unit" type="text" placeholder="หน่วย" class="w-full px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
+                                        <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="w-full col-span-2 sm:col-span-1 px-2 py-2.5 sm:py-1.5 border border-slate-200 rounded-lg text-sm sm:text-xs min-w-0">
                                     </div>
                                 </div>
                             </div>
@@ -1051,22 +1051,22 @@
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
+                            <div class="min-w-0">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">วิธีจัดส่ง</label>
                                 <select v-model="messageForm.shippingMethod" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                                     <option value="shipping">📦 จัดส่งพัสดุ</option>
                                     <option value="pickup">🏠 นัดรับ</option>
                                 </select>
                             </div>
-                            <div v-if="messageForm.shippingMethod === 'shipping'">
+                            <div v-if="messageForm.shippingMethod === 'shipping'" class="min-w-0">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">ค่าจัดส่ง (บาท)</label>
                                 <input v-model.number="messageForm.shippingFee" type="number" inputmode="decimal" placeholder="0" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
-                            <div v-else>
+                            <div v-else class="min-w-0">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">สถานที่นัดรับ</label>
                                 <input v-model="messageForm.pickupLocation" type="text" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
-                            <div class="col-span-2">
+                            <div class="col-span-2 min-w-0">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">วันที่จัดส่ง/นัดรับ</label>
                                 <input v-model="messageForm.deliveryDateText" type="text" placeholder="เช่น 20 มกราคม" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
@@ -1082,11 +1082,11 @@
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
-                            <div>
+                            <div class="min-w-0">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">{{ messageForm.paymentMode === 'cod' ? 'ยอดรวมที่ต้องเก็บ' : 'ยอดโอนเต็ม' }} (บาท)</label>
                                 <input v-model.number="messageForm.fullPay" type="number" inputmode="decimal" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
-                            <div v-if="messageForm.paymentMode === 'default'">
+                            <div v-if="messageForm.paymentMode === 'default'" class="min-w-0">
                                 <label class="text-xs font-bold text-slate-700 block mb-1">ยอดมัดจำ (บาท)</label>
                                 <input v-model.number="messageForm.deposit" type="number" inputmode="decimal" class="w-full px-2.5 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm sm:text-xs">
                             </div>
@@ -1106,7 +1106,7 @@
                     <!-- Right: Preview -->
                     <div class="flex-col" :class="messageMobileTab === 'preview' ? 'flex' : 'hidden md:flex'">
                         <label class="text-xs font-bold text-slate-700 mb-2">ตัวอย่างข้อความ (แตะเพื่อเลือกทั้งหมด)</label>
-                        <div @click="selectMessageText" class="flex-1 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm whitespace-pre-wrap text-slate-800 leading-relaxed min-h-[280px] cursor-pointer hover:bg-amber-100/70 transition-colors select-all" ref="messagePreviewEl">{{ generatedMessage }}</div>
+                        <div @click="selectMessageText" class="flex-1 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm whitespace-pre-wrap break-words text-slate-800 leading-relaxed min-h-[280px] cursor-pointer hover:bg-amber-100/70 transition-colors select-all" ref="messagePreviewEl">{{ generatedMessage }}</div>
                         <button type="button" @click="messageMobileTab = 'form'" class="md:hidden w-full mt-3 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
                             <i class="fa-solid fa-pen-to-square"></i> กลับไปแก้ไขข้อมูล
                         </button>
