@@ -526,6 +526,10 @@
                             <i class="fa-solid fa-comment-dots"></i>
                             <span>แจ้งลูกค้า</span>
                         </button>
+                        <button v-if="order.deliveryType === 'shipping'" @click="openTrackingModal(order)" title="สร้างข้อความแจ้งเลขพัสดุ" class="px-3 py-2.5 sm:px-2.5 sm:py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-medium border border-sky-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs">
+                            <i class="fa-solid fa-truck-fast"></i>
+                            <span>แจ้งเลขพัสดุ</span>
+                        </button>
                     </div>
                     
                     <div class="flex items-center gap-1">
@@ -614,6 +618,9 @@
                                 </button>
                                 <button @click="openMessageModal(order)" title="สร้างข้อความแจ้งลูกค้า" class="p-2 md:p-1.5 hover:bg-orange-50 text-orange-600 rounded-lg">
                                     <i class="fa-solid fa-comment-dots"></i>
+                                </button>
+                                <button v-if="order.deliveryType === 'shipping'" @click="openTrackingModal(order)" title="สร้างข้อความแจ้งเลขพัสดุ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg">
+                                    <i class="fa-solid fa-truck-fast"></i>
                                 </button>
                                 <button @click="openReceiptModal(order)" title="พิมพ์ใบเสร็จ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg">
                                     <i class="fa-solid fa-receipt"></i>
@@ -1159,6 +1166,52 @@
             </div>
         </div>
 
+        <!-- Tracking Number Notification Modal -->
+        <div v-if="trackingTarget" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm no-print">
+            <div class="bg-white sm:rounded-2xl shadow-xl w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[92vh] overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-sky-500 to-cyan-500 shrink-0">
+                    <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-truck-fast"></i> แจ้งเลขพัสดุ
+                    </h3>
+                    <button @click="closeTrackingModal" class="text-white/80 hover:text-white transition-colors p-2 -mr-2">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                    <div class="text-xs text-slate-500">
+                        ลูกค้า: <span class="font-semibold text-slate-800">{{ trackingTarget.customerName }}</span>
+                        <span v-if="trackingTarget.expressCompany"> · 🚚 {{ trackingTarget.expressCompany }}</span>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-700 block mb-1">เลขพัสดุ</label>
+                        <input ref="trackingInputEl" v-model="trackingNumberInput" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="เช่น JC013496084TH"
+                               class="w-full px-3 py-3 sm:py-2.5 border border-slate-200 rounded-xl text-base sm:text-sm font-mono font-bold tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-700 block mb-2">ตัวอย่างข้อความ (แตะเพื่อเลือกทั้งหมด)</label>
+                        <div @click="selectMessageText" class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-sm whitespace-pre-wrap break-words text-slate-800 leading-relaxed cursor-pointer hover:bg-sky-100/70 transition-colors select-all">{{ generatedTrackingMessage }}</div>
+                    </div>
+
+                    <label class="flex items-center gap-2 text-xs font-medium text-sky-700 cursor-pointer py-1">
+                        <input type="checkbox" v-model="trackingSaveToOrder" class="rounded text-sky-500 w-5 h-5 sm:w-4 sm:h-4">
+                        บันทึกเลขพัสดุนี้ลงในออเดอร์ด้วยเมื่อกดคัดลอก
+                    </label>
+                </div>
+
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 shrink-0">
+                    <button @click="closeTrackingModal" class="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-medium rounded-xl text-sm">
+                        ปิด
+                    </button>
+                    <button @click="copyTrackingMessage" class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95">
+                        <i class="fa-solid fa-copy"></i> คัดลอกข้อความ
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div v-if="receiptTarget" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto no-print">
             <div class="bg-white sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-slate-200 w-full max-w-lg min-h-full sm:min-h-0 overflow-hidden sm:my-6">
                 <div class="p-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
@@ -1322,6 +1375,12 @@
 
                 const isMessageModalOpen = ref(false);
                 const messageMobileTab = ref('form');
+
+                // Tracking Number Notification Modal
+                const trackingTarget = ref(null);
+                const trackingNumberInput = ref('');
+                const trackingSaveToOrder = ref(true);
+                const trackingInputEl = ref(null);
                 const messageSourceOrder = ref(null);
                 const messageItems = ref([{ id: Date.now(), details: '', qty: 1, unit: 'ช่อ', price: 0 }]);
                 const messageForm = ref({
@@ -1836,6 +1895,73 @@
                     }
                 }
 
+                // Tracking Number Notification Functions
+                const TRACKING_URL_BASE = 'https://track.thailandpost.co.th/?trackNumber=';
+
+                function openTrackingModal(order) {
+                    trackingTarget.value = order;
+                    trackingNumberInput.value = order.trackingNumber || '';
+                    trackingSaveToOrder.value = true;
+                    nextTick(() => { if (!order.trackingNumber && trackingInputEl.value) trackingInputEl.value.focus(); });
+                }
+
+                function closeTrackingModal() {
+                    trackingTarget.value = null;
+                }
+
+                // Strip whitespace (incl. pasted line breaks) and force upper-case: Thailand Post codes like JC013496084TH
+                const cleanTrackingNumber = computed(() => (trackingNumberInput.value || '').replace(/\s+/g, '').toUpperCase());
+
+                const generatedTrackingMessage = computed(() => {
+                    const n = cleanTrackingNumber.value || '(เลขพัสดุ)';
+                    return `ทางร้านจัดส่งสินค้าเรียบร้อยแล้วนะคะ\n` +
+                        `เลขพัสดุ: ${n}\n` +
+                        `ติดตามพัสดุได้ที่\n` +
+                        `${TRACKING_URL_BASE}${n}\n\n` +
+                        `หากได้รับสินค้าแล้ว รบกวนส่งรูปรีวิวให้ทางร้านได้นะคะ\n` +
+                        `ทางร้านดีใจมากๆ ที่ได้เป็นส่วนหนึ่งในความสุขของคุณลูกค้าค่ะ\n` +
+                        `ขอบพระคุณมากค่ะ`;
+                });
+
+                async function copyTrackingMessage() {
+                    const number = cleanTrackingNumber.value;
+                    if (!number) {
+                        showToast('กรุณากรอกเลขพัสดุก่อนคัดลอกนะครับ');
+                        if (trackingInputEl.value) trackingInputEl.value.focus();
+                        return;
+                    }
+                    const text = generatedTrackingMessage.value;
+                    let copied = false;
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(text);
+                        } else {
+                            const textArea = document.createElement('textarea');
+                            textArea.value = text;
+                            textArea.style.position = 'fixed';
+                            textArea.style.left = '-9999px';
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                        }
+                        copied = true;
+                    } catch (err) {
+                        showToast('คัดลอกไม่สำเร็จ ลองแตะเลือกข้อความแล้วคัดลอกเองครับ');
+                        return;
+                    }
+
+                    const order = trackingTarget.value;
+                    if (copied && trackingSaveToOrder.value && order && order.trackingNumber !== number) {
+                        order.trackingNumber = number;
+                        db.collection('orders').doc(order.id).update({ trackingNumber: number })
+                            .catch(() => showToast('คัดลอกแล้ว แต่บันทึกเลขพัสดุไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                        showToast('คัดลอกข้อความและบันทึกเลขพัสดุแล้ว! ✅');
+                    } else {
+                        showToast('คัดลอกข้อความสำเร็จแล้ว! ✅');
+                    }
+                }
+
                 function copyShippingAddress(order) {
                     const text = `ชื่อผู้รับ: ${order.customerName}\nเบอร์โทร: ${order.customerPhone || '-'}\nที่อยู่จัดส่ง: ${order.location || '-'}`;
                     const dummy = document.createElement("textarea");
@@ -2330,6 +2456,7 @@
                     });
 
                     window.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && trackingTarget.value && !galleryTarget.value) { closeTrackingModal(); return; }
                         if (!galleryTarget.value) return;
                         if (e.key === 'Escape') closeGallery();
                         else if (e.key === 'ArrowRight') nextGalleryImage();
@@ -2356,7 +2483,9 @@
                     messageSourceOrder, messageTotalMismatch, useComputedTotalAsFullPay, saveMessageTotalsToOrder,
                     authChecked, isLoggedIn, loginForm, loginError, isLoggingIn, handleLogin, handleLogout,
                     openMessageModal, closeMessageModal, addMessageItem, removeMessageItem,
-                    selectMessageText, copyMessageToClipboard
+                    selectMessageText, copyMessageToClipboard,
+                    trackingTarget, trackingNumberInput, trackingSaveToOrder, trackingInputEl,
+                    openTrackingModal, closeTrackingModal, generatedTrackingMessage, copyTrackingMessage
                 };
             }
         }).mount('#app');
