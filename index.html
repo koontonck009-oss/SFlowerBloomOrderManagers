@@ -482,9 +482,9 @@
                                 <div v-else class="text-[11px] text-amber-600 font-medium bg-amber-50/80 px-2 py-1 rounded border border-amber-100">
                                     ⏳ ยังไม่ได้กรอกเลขพัสดุ
                                 </div>
-                                <button @click="copyShippingAddress(order)" title="คัดลอกที่อยู่ไปแปะหน้ากล่อง" class="w-full py-1.5 px-3 bg-white hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
+                                <button @click="copyShippingAddress(order)" title="คัดลอกเฉพาะที่อยู่จัดส่ง" class="w-full py-1.5 px-3 bg-white hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs">
                                     <i class="fa-regular fa-copy"></i>
-                                    <span>คัดลอก ชื่อ-ที่อยู่ จัดส่งพัสดุ</span>
+                                    <span>คัดลอกที่อยู่จัดส่ง</span>
                                 </button>
                             </div>
                         </div>
@@ -2142,14 +2142,18 @@
                 }
 
                 function copyShippingAddress(order) {
-                    const text = `ชื่อผู้รับ: ${order.customerName}\nเบอร์โทร: ${order.customerPhone || '-'}\nที่อยู่จัดส่ง: ${order.location || '-'}`;
+                    const address = (order.location || '').trim();
+                    if (!address) {
+                        showToast('ยังไม่ได้กรอกที่อยู่จัดส่งในออเดอร์นี้');
+                        return;
+                    }
                     const dummy = document.createElement("textarea");
                     document.body.appendChild(dummy);
-                    dummy.value = text;
+                    dummy.value = address;
                     dummy.select();
                     document.execCommand("copy");
                     document.body.removeChild(dummy);
-                    showToast('คัดลอกที่อยู่จัดส่งพัสดุเรียบร้อย!');
+                    showToast('คัดลอกที่อยู่จัดส่งเรียบร้อย!');
                 }
 
                 // Leaflet Map Init
