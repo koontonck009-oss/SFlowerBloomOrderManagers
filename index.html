@@ -253,6 +253,17 @@
             </div>
         </header>
 
+        <!-- Main tab switcher -->
+        <div class="flex items-center gap-1 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-1.5 mb-4 sm:mb-6 no-print">
+            <button @click="mainTab = 'orders'" :class="mainTab === 'orders' ? 'bg-pink-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'" class="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-clipboard-list"></i> ออเดอร์
+            </button>
+            <button @click="mainTab = 'accounting'" :class="mainTab === 'accounting' ? 'bg-pink-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'" class="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-wallet"></i> บัญชีรายรับ-รายจ่าย
+            </button>
+        </div>
+
+        <div v-show="mainTab === 'orders'">
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-4 mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 no-print">
             <div class="flex flex-col lg:flex-row justify-between items-center gap-3 sm:gap-4">
                 <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
@@ -459,9 +470,14 @@
                             </div>
                             <p class="text-slate-700 leading-relaxed font-medium select-all">{{ order.location || 'ไม่ได้ระบุที่อยู่จัดส่ง' }}</p>
                             <div class="pt-1 flex flex-col gap-1.5">
-                                <div v-if="order.trackingNumber" class="bg-white p-2 rounded-lg border border-sky-200 flex items-center justify-between">
-                                    <span class="text-slate-500 font-medium">เลขพัสดุ:</span>
-                                    <span class="font-mono font-bold text-sky-700 text-xs tracking-wider">{{ order.trackingNumber }}</span>
+                                <div v-if="order.trackingNumber" class="bg-white p-2 rounded-lg border border-sky-200 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-slate-500 font-medium">เลขพัสดุ:</span>
+                                        <span class="font-mono font-bold text-sky-700 text-xs tracking-wider">{{ order.trackingNumber }}</span>
+                                    </div>
+                                    <a :href="trackingUrl(order)" target="_blank" rel="noopener" class="w-full py-2 sm:py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 text-xs transition-colors">
+                                        <i class="fa-solid fa-location-crosshairs"></i> ติดตามพัสดุ
+                                    </a>
                                 </div>
                                 <div v-else class="text-[11px] text-amber-600 font-medium bg-amber-50/80 px-2 py-1 rounded border border-amber-100">
                                     ⏳ ยังไม่ได้กรอกเลขพัสดุ
@@ -583,6 +599,7 @@
                                 <div class="text-slate-500 mt-0.5">
                                     <span v-if="order.expressCompany" class="font-bold text-sky-700 mr-1">[{{ order.expressCompany }}]</span>
                                     <span v-if="order.trackingNumber" class="font-mono text-slate-700">เลขพัสดุ: {{ order.trackingNumber }}</span>
+                                    <a v-if="order.trackingNumber" :href="trackingUrl(order)" target="_blank" rel="noopener" class="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-semibold"><i class="fa-solid fa-location-crosshairs"></i>ติดตาม</a>
                                 </div>
                             </div>
                             <div v-else>
@@ -622,6 +639,7 @@
                                 <button v-if="order.deliveryType === 'shipping'" @click="openTrackingModal(order)" title="สร้างข้อความแจ้งเลขพัสดุ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg">
                                     <i class="fa-solid fa-truck-fast"></i>
                                 </button>
+                                <a v-if="order.trackingNumber" :href="trackingUrl(order)" target="_blank" rel="noopener" title="ติดตามพัสดุ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg inline-flex items-center"><i class="fa-solid fa-location-crosshairs"></i></a>
                                 <button @click="openReceiptModal(order)" title="พิมพ์ใบเสร็จ" class="p-2 md:p-1.5 hover:bg-sky-50 text-sky-600 rounded-lg">
                                     <i class="fa-solid fa-receipt"></i>
                                 </button>
@@ -647,6 +665,117 @@
             <button @click="openModal()" class="mt-4 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-xl text-sm transition-all shadow-sm inline-flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i> เพิ่มออเดอร์แรก
             </button>
+        </div>
+
+        </div><!-- /orders tab -->
+
+        <!-- ===================== บัญชีรายรับ-รายจ่าย ===================== -->
+        <div v-if="mainTab === 'accounting'" class="space-y-4 sm:space-y-6 mb-8 no-print">
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-4">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button @click="shiftAccMonth(-1)" :disabled="accAllMonths" title="เดือนก่อนหน้า" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-600 transition-colors"><i class="fa-solid fa-chevron-left"></i></button>
+                        <input type="month" v-model="accMonth" :disabled="accAllMonths" class="px-3 py-2.5 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold text-slate-700 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-pink-300">
+                        <button @click="shiftAccMonth(1)" :disabled="accAllMonths" title="เดือนถัดไป" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-600 transition-colors"><i class="fa-solid fa-chevron-right"></i></button>
+                        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer ml-1 select-none">
+                            <input type="checkbox" v-model="accAllMonths" class="w-4 h-4 accent-pink-600"> ทุกเดือน
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-3 lg:flex items-center gap-2">
+                        <button @click="openTxModal('income')" class="px-3 py-2.5 lg:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"><i class="fa-solid fa-plus"></i> รายรับ</button>
+                        <button @click="openTxModal('expense')" class="px-3 py-2.5 lg:py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"><i class="fa-solid fa-plus"></i> รายจ่าย</button>
+                        <button @click="exportAccountingCSV" class="px-3 py-2.5 lg:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"><i class="fa-solid fa-file-csv text-slate-500"></i> CSV</button>
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                    <i class="fa-solid fa-circle-info mr-1"></i>รายรับจากออเดอร์นับเมื่อสถานะเป็น "ส่งสำเร็จ" ด้วยยอดเต็ม ตามวันที่กดส่งสำเร็จ (ออเดอร์เก่าที่ยังไม่มีวันที่นี้ใช้วันกำหนดส่งแทน) ออเดอร์ที่ยังไม่เสร็จหรือยกเลิกไม่ถูกนับ
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="bg-emerald-50/70 rounded-2xl p-4 border border-emerald-100">
+                    <span class="text-xs font-medium text-emerald-700 block"><i class="fa-solid fa-arrow-down mr-1"></i>รายรับ</span>
+                    <span class="text-2xl font-bold text-emerald-800">฿{{ formatNumber(accIncome) }}</span>
+                    <span class="text-[11px] text-emerald-600 block mt-0.5">ออเดอร์ ฿{{ formatNumber(accIncomeFromOrders) }} · อื่นๆ ฿{{ formatNumber(accIncome - accIncomeFromOrders) }}</span>
+                </div>
+                <div class="bg-rose-50/70 rounded-2xl p-4 border border-rose-100">
+                    <span class="text-xs font-medium text-rose-700 block"><i class="fa-solid fa-arrow-up mr-1"></i>รายจ่าย</span>
+                    <span class="text-2xl font-bold text-rose-800">฿{{ formatNumber(accExpense) }}</span>
+                    <span class="text-[11px] text-rose-600 block mt-0.5">{{ accExpenseCount }} รายการ</span>
+                </div>
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                    <span class="text-xs font-medium text-slate-500 block"><i class="fa-solid fa-scale-balanced mr-1"></i>กำไรสุทธิ</span>
+                    <span class="text-2xl font-bold" :class="accProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'">{{ accProfit < 0 ? '-' : '' }}฿{{ formatNumber(Math.abs(accProfit)) }}</span>
+                    <span class="text-[11px] text-slate-400 block mt-0.5">รายรับ − รายจ่าย</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-column text-pink-600 mr-1"></i> เทียบ 6 เดือนล่าสุด</h3>
+                        <div class="flex items-center gap-3 text-[11px] text-slate-500">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span>รับ</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>จ่าย</span>
+                        </div>
+                    </div>
+                    <div class="flex items-end justify-between gap-2">
+                        <div v-for="m in accChart" :key="m.key" class="flex-1 min-w-0 flex flex-col items-center gap-1">
+                            <div class="w-full flex items-end justify-center gap-0.5" style="height:108px" :title="m.label + ' | รับ ฿' + formatNumber(m.income) + ' | จ่าย ฿' + formatNumber(m.expense)">
+                                <div class="w-1/2 max-w-[20px] rounded-t bg-emerald-400" :style="{ height: m.incomeH + 'px' }"></div>
+                                <div class="w-1/2 max-w-[20px] rounded-t bg-rose-400" :style="{ height: m.expenseH + 'px' }"></div>
+                            </div>
+                            <span class="text-[10px] text-slate-500 whitespace-nowrap">{{ m.label }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4">
+                    <h3 class="text-sm font-bold text-slate-800 mb-3"><i class="fa-solid fa-chart-pie text-pink-600 mr-1"></i> รายจ่ายแยกตามหมวด</h3>
+                    <div v-if="accExpenseBreakdown.length === 0" class="text-xs text-slate-400 py-8 text-center">ยังไม่มีรายจ่ายในช่วงนี้</div>
+                    <div v-else class="space-y-2.5">
+                        <div v-for="c in accExpenseBreakdown" :key="c.name">
+                            <div class="flex items-center justify-between text-xs mb-1">
+                                <span class="font-semibold text-slate-700">{{ c.name }}</span>
+                                <span class="text-slate-500">฿{{ formatNumber(c.amount) }} <span class="text-slate-400">({{ c.pct }}%)</span></span>
+                            </div>
+                            <div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-rose-400 rounded-full" :style="{ width: c.pct + '%' }"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="p-3 sm:p-4 border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-list-ul text-pink-600 mr-1"></i> รายการ ({{ accLedger.length }})</h3>
+                    <div class="flex items-center gap-1.5 text-xs">
+                        <button @click="accTypeFilter = 'all'" :class="accTypeFilter === 'all' ? 'bg-slate-900 text-white font-medium' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1.5 rounded-full transition-colors">ทั้งหมด</button>
+                        <button @click="accTypeFilter = 'income'" :class="accTypeFilter === 'income' ? 'bg-emerald-600 text-white font-medium' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'" class="px-3 py-1.5 rounded-full transition-colors">รายรับ</button>
+                        <button @click="accTypeFilter = 'expense'" :class="accTypeFilter === 'expense' ? 'bg-rose-600 text-white font-medium' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'" class="px-3 py-1.5 rounded-full transition-colors">รายจ่าย</button>
+                    </div>
+                </div>
+                <div v-if="accLedger.length === 0" class="p-10 text-center text-sm text-slate-400">ยังไม่มีรายการในช่วงนี้</div>
+                <ul v-else class="divide-y divide-slate-100">
+                    <li v-for="e in accLedger" :key="e.key" class="flex items-center gap-3 px-3 sm:px-4 py-3">
+                        <div class="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-sm" :class="e.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'">
+                            <i class="fa-solid" :class="e.type === 'income' ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-sm font-semibold text-slate-800">{{ e.category }}</span>
+                                <span v-if="e.source === 'order'" class="text-[10px] px-1.5 py-0.5 rounded bg-pink-50 text-pink-600 border border-pink-100 font-semibold">อัตโนมัติ</span>
+                            </div>
+                            <p class="text-xs text-slate-500 truncate">{{ formatDate(e.date) }}<span v-if="e.note"> · {{ e.note }}</span></p>
+                        </div>
+                        <span class="text-sm font-bold shrink-0 text-right" :class="e.type === 'income' ? 'text-emerald-700' : 'text-rose-700'">{{ e.type === 'income' ? '+' : '-' }}฿{{ formatNumber(e.amount) }}</span>
+                        <div v-if="e.source === 'manual'" class="flex items-center shrink-0">
+                            <button @click="openTxModal(e.type, e)" title="แก้ไข" class="w-9 h-9 hover:bg-slate-100 text-slate-500 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button @click="deleteTx(e)" title="ลบ" class="w-9 h-9 hover:bg-rose-50 text-rose-500 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </li>
+                </ul>
+            </div>
         </div>
 
         <div id="printable-work-orders" :class="isMeasuringPrint ? 'print-measure-mode' : 'hidden'">
@@ -912,7 +1041,7 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">เลขพัสดุ (Tracking No.)</label>
-                                <input v-model="form.trackingNumber" type="text" inputmode="numeric" placeholder="ระบุเลขพัสดุ" class="w-full px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono">
+                                <input v-model="form.trackingNumber" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="เช่น EX123456789TH" class="w-full px-3 py-2.5 sm:py-2 bg-white border border-slate-200 rounded-xl text-sm font-mono">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">ค่าจัดส่ง (บาท)</label>
@@ -1167,6 +1296,44 @@
         </div>
 
         <!-- Tracking Number Notification Modal -->
+        <!-- Modal: เพิ่ม/แก้ไข รายรับ-รายจ่าย -->
+        <div v-if="isTxModalOpen" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm no-print" @click.self="closeTxModal">
+            <form @submit.prevent="saveTx" class="bg-white w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-2xl">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+                    <h3 class="text-base font-bold text-slate-900">{{ editingTxId ? 'แก้ไขรายการ' : 'เพิ่มรายการ' }}</h3>
+                    <button type="button" @click="closeTxModal" class="w-10 h-10 -mr-2 hover:bg-slate-100 rounded-lg text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="p-5 space-y-4">
+                    <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+                        <button type="button" @click="setTxType('income')" :class="txForm.type === 'income' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600'" class="py-2.5 rounded-lg text-sm font-semibold transition-all">รายรับ</button>
+                        <button type="button" @click="setTxType('expense')" :class="txForm.type === 'expense' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-600'" class="py-2.5 rounded-lg text-sm font-semibold transition-all">รายจ่าย</button>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่</label>
+                        <input v-model="txForm.date" required type="date" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-base sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">หมวดหมู่</label>
+                        <select v-model="txForm.category" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-base sm:text-sm bg-white">
+                            <option v-for="c in txCategoryOptions" :key="c" :value="c">{{ c }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">จำนวนเงิน (บาท)</label>
+                        <input v-model="txForm.amount" required type="number" min="0.01" step="any" inputmode="decimal" placeholder="0" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-base sm:text-sm font-semibold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">รายละเอียด (ไม่บังคับ)</label>
+                        <input v-model="txForm.note" type="text" maxlength="200" placeholder="เช่น ซื้อลวดกำมะหยี่ร้าน..." class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-base sm:text-sm">
+                    </div>
+                </div>
+                <div class="px-5 pb-5 flex gap-2">
+                    <button type="button" @click="closeTxModal" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm">ยกเลิก</button>
+                    <button type="submit" :class="txForm.type === 'income' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'" class="flex-1 py-2.5 text-white font-semibold rounded-xl text-sm shadow-sm">บันทึก</button>
+                </div>
+            </form>
+        </div>
+
         <div v-if="trackingTarget" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm no-print">
             <div class="bg-white sm:rounded-2xl shadow-xl w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[92vh] overflow-hidden flex flex-col">
                 <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-sky-500 to-cyan-500 shrink-0">
@@ -1618,7 +1785,14 @@
                 function handleStatusChange(order, event) {
                     const newStatus = event.target.value;
                     order.status = newStatus;
-                    db.collection('orders').doc(order.id).update({ status: newStatus })
+                    const statusUpdate = { status: newStatus };
+                    if (newStatus === 'completed') {
+                        statusUpdate.completedAt = localDateString();
+                    } else if (order.completedAt) {
+                        statusUpdate.completedAt = '';
+                    }
+                    order.completedAt = statusUpdate.completedAt !== undefined ? statusUpdate.completedAt : order.completedAt;
+                    db.collection('orders').doc(order.id).update(statusUpdate)
                         .catch(() => showToast('อัปเดตสถานะไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     showToast('อัปเดตสถานะเรียบร้อย');
                 }
@@ -1897,6 +2071,11 @@
 
                 // Tracking Number Notification Functions
                 const TRACKING_URL_BASE = 'https://track.thailandpost.co.th/?trackNumber=';
+
+                function trackingUrl(order) {
+                    const n = String((order && order.trackingNumber) || '').replace(/\s+/g, '').toUpperCase();
+                    return TRACKING_URL_BASE + encodeURIComponent(n);
+                }
 
                 function openTrackingModal(order) {
                     trackingTarget.value = order;
@@ -2382,6 +2561,168 @@
                 }
 
                 let isFirstOrdersLoad = true;
+                // ===== บัญชีรายรับ-รายจ่าย =====
+                const ACC_INCOME_CATEGORIES = ['ขายหน้าร้าน', 'รายรับอื่นๆ'];
+                const ACC_EXPENSE_CATEGORIES = ['วัสดุ/ดอกไม้', 'บรรจุภัณฑ์', 'ค่าจัดส่ง', 'ค่าโฆษณา', 'ค่าเดินทาง/น้ำมัน', 'ค่าธรรมเนียม', 'อื่นๆ'];
+                const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+                function localDateString(d = new Date()) {
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                }
+
+                const mainTab = ref('orders');
+                const transactions = ref([]);
+                const accMonth = ref(localDateString().slice(0, 7));
+                const accAllMonths = ref(false);
+                const accTypeFilter = ref('all');
+                const isTxModalOpen = ref(false);
+                const editingTxId = ref(null);
+                const txForm = ref({ type: 'expense', date: '', category: ACC_EXPENSE_CATEGORIES[0], amount: '', note: '' });
+
+                const accOrderEntries = computed(() => orders.value
+                    .filter(o => o.status === 'completed')
+                    .map(o => {
+                        const firstLine = String(o.products || '').split('\n')[0].trim();
+                        return {
+                            key: 'o-' + o.id, source: 'order', type: 'income',
+                            date: String(o.completedAt || o.deliveryDate || o.orderDate || '').slice(0, 10),
+                            category: 'ออเดอร์', amount: Number(o.totalAmount) || 0,
+                            note: [o.customerName, firstLine].filter(Boolean).join(' · ')
+                        };
+                    }));
+                const accManualEntries = computed(() => transactions.value.map(t => ({
+                    key: 't-' + t.id, source: 'manual', id: t.id, type: t.type,
+                    date: String(t.date || '').slice(0, 10), category: t.category || '',
+                    amount: Number(t.amount) || 0, note: t.note || ''
+                })));
+                const accAllEntries = computed(() => [...accOrderEntries.value, ...accManualEntries.value]
+                    .sort((a, b) => b.date.localeCompare(a.date)));
+                const accPeriodEntries = computed(() => accAllMonths.value
+                    ? accAllEntries.value
+                    : accAllEntries.value.filter(e => e.date.slice(0, 7) === accMonth.value));
+                const accLedger = computed(() => accTypeFilter.value === 'all'
+                    ? accPeriodEntries.value
+                    : accPeriodEntries.value.filter(e => e.type === accTypeFilter.value));
+
+                function accSum(list, type) {
+                    return list.filter(e => e.type === type).reduce((sum, e) => sum + e.amount, 0);
+                }
+                const accIncome = computed(() => accSum(accPeriodEntries.value, 'income'));
+                const accExpense = computed(() => accSum(accPeriodEntries.value, 'expense'));
+                const accProfit = computed(() => accIncome.value - accExpense.value);
+                const accIncomeFromOrders = computed(() => accPeriodEntries.value
+                    .filter(e => e.source === 'order').reduce((sum, e) => sum + e.amount, 0));
+                const accExpenseCount = computed(() => accPeriodEntries.value.filter(e => e.type === 'expense').length);
+
+                const accExpenseBreakdown = computed(() => {
+                    const map = {};
+                    accPeriodEntries.value.filter(e => e.type === 'expense').forEach(e => {
+                        const k = e.category || 'อื่นๆ';
+                        map[k] = (map[k] || 0) + e.amount;
+                    });
+                    const total = accExpense.value || 1;
+                    return Object.entries(map)
+                        .map(([name, amount]) => ({ name, amount, pct: Math.round(amount / total * 100) }))
+                        .sort((a, b) => b.amount - a.amount);
+                });
+
+                const accChart = computed(() => {
+                    const base = (accAllMonths.value || !accMonth.value) ? localDateString().slice(0, 7) : accMonth.value;
+                    const [y, m] = base.split('-').map(Number);
+                    const months = [];
+                    for (let i = 5; i >= 0; i--) {
+                        const d = new Date(y, m - 1 - i, 1);
+                        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        const list = accAllEntries.value.filter(e => e.date.slice(0, 7) === key);
+                        months.push({
+                            key,
+                            label: `${THAI_MONTHS_SHORT[d.getMonth()]} ${String((d.getFullYear() + 543) % 100).padStart(2, '0')}`,
+                            income: accSum(list, 'income'),
+                            expense: accSum(list, 'expense')
+                        });
+                    }
+                    const max = Math.max(1, ...months.flatMap(x => [x.income, x.expense]));
+                    const h = v => v > 0 ? Math.max(3, Math.round(v / max * 104)) : 0;
+                    return months.map(x => ({ ...x, incomeH: h(x.income), expenseH: h(x.expense) }));
+                });
+
+                function shiftAccMonth(delta) {
+                    const base = accMonth.value || localDateString().slice(0, 7);
+                    const [y, m] = base.split('-').map(Number);
+                    const d = new Date(y, m - 1 + delta, 1);
+                    accMonth.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                }
+
+                const txCategoryOptions = computed(() =>
+                    txForm.value.type === 'income' ? ACC_INCOME_CATEGORIES : ACC_EXPENSE_CATEGORIES);
+
+                function setTxType(type) {
+                    txForm.value.type = type;
+                    const list = type === 'income' ? ACC_INCOME_CATEGORIES : ACC_EXPENSE_CATEGORIES;
+                    if (!list.includes(txForm.value.category)) txForm.value.category = list[0];
+                }
+
+                function openTxModal(type = 'expense', entry = null) {
+                    if (entry) {
+                        editingTxId.value = entry.id;
+                        txForm.value = { type: entry.type, date: entry.date, category: entry.category, amount: entry.amount, note: entry.note };
+                    } else {
+                        editingTxId.value = null;
+                        const list = type === 'income' ? ACC_INCOME_CATEGORIES : ACC_EXPENSE_CATEGORIES;
+                        txForm.value = { type, date: localDateString(), category: list[0], amount: '', note: '' };
+                    }
+                    isTxModalOpen.value = true;
+                }
+                function closeTxModal() { isTxModalOpen.value = false; editingTxId.value = null; }
+
+                function saveTx() {
+                    const amount = Number(txForm.value.amount);
+                    if (!(amount > 0)) { showToast('กรุณากรอกจำนวนเงินให้มากกว่า 0'); return; }
+                    if (!txForm.value.date) { showToast('กรุณาเลือกวันที่'); return; }
+                    const id = editingTxId.value || ('TX-' + Date.now());
+                    const data = {
+                        id, type: txForm.value.type, date: txForm.value.date,
+                        category: txForm.value.category, amount,
+                        note: (txForm.value.note || '').trim()
+                    };
+                    db.collection('transactions').doc(id).set(data)
+                        .then(() => showToast(editingTxId.value ? 'แก้ไขรายการเรียบร้อย' : 'บันทึกรายการเรียบร้อย'))
+                        .catch(() => showToast('บันทึกไม่สำเร็จ ตรวจสอบการเชื่อมต่อ / Firestore rules'));
+                    // ย้ายมุมมองไปเดือนของรายการที่เพิ่งบันทึก เพื่อให้เห็นรายการทันที
+                    if (!accAllMonths.value) accMonth.value = data.date.slice(0, 7);
+                    closeTxModal();
+                }
+
+                function deleteTx(entry) {
+                    const label = `${entry.category}${entry.note ? ' - ' + entry.note : ''}`;
+                    if (!window.confirm(`ลบรายการ "${label}" จำนวน ฿${formatNumber(entry.amount)} ?`)) return;
+                    db.collection('transactions').doc(entry.id).delete()
+                        .then(() => showToast('ลบรายการเรียบร้อย'))
+                        .catch(() => showToast('ลบไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                }
+
+                function exportAccountingCSV() {
+                    const esc = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+                    const rows = [['วันที่', 'ประเภท', 'หมวดหมู่', 'รายละเอียด', 'จำนวนเงิน (บาท)']];
+                    [...accPeriodEntries.value].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
+                        rows.push([e.date, e.type === 'income' ? 'รายรับ' : 'รายจ่าย', e.category, e.note, e.amount]);
+                    });
+                    rows.push([]);
+                    rows.push(['', '', '', 'รวมรายรับ', accIncome.value]);
+                    rows.push(['', '', '', 'รวมรายจ่าย', accExpense.value]);
+                    rows.push(['', '', '', 'กำไรสุทธิ', accProfit.value]);
+                    const csv = '\uFEFF' + rows.map(r => r.map(esc).join(',')).join('\r\n');
+                    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `accounting_${accAllMonths.value ? 'all' : accMonth.value}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                    showToast('ส่งออกไฟล์บัญชีสำเร็จ');
+                }
+
                 let listenersStarted = false;
 
                 function startFirestoreListeners() {
@@ -2409,6 +2750,14 @@
                     }, (err) => {
                         console.error('Firestore (orders) error:', err);
                         showToast('เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจสอบ Firebase config');
+                    });
+
+                    // รายรับ-รายจ่ายที่กรอกเอง
+                    db.collection('transactions').onSnapshot((snapshot) => {
+                        transactions.value = snapshot.docs.map(d => d.data());
+                    }, (err) => {
+                        console.error('Firestore (transactions) error:', err);
+                        showToast('โหลดข้อมูลบัญชีไม่สำเร็จ ตรวจสอบ Firestore rules ของ transactions');
                     });
                 }
 
@@ -2444,6 +2793,7 @@
                 function handleLogout() {
                     auth.signOut();
                     loginForm.value = { username: '', password: '' };
+                    mainTab.value = 'orders';
                 }
 
                 onMounted(() => {
@@ -2456,6 +2806,7 @@
                     });
 
                     window.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && isTxModalOpen.value) { closeTxModal(); return; }
                         if (e.key === 'Escape' && trackingTarget.value && !galleryTarget.value) { closeTrackingModal(); return; }
                         if (!galleryTarget.value) return;
                         if (e.key === 'Escape') closeGallery();
@@ -2485,7 +2836,11 @@
                     openMessageModal, closeMessageModal, addMessageItem, removeMessageItem,
                     selectMessageText, copyMessageToClipboard,
                     trackingTarget, trackingNumberInput, trackingSaveToOrder, trackingInputEl,
-                    openTrackingModal, closeTrackingModal, generatedTrackingMessage, copyTrackingMessage
+                    openTrackingModal, closeTrackingModal, generatedTrackingMessage, copyTrackingMessage, trackingUrl,
+                    mainTab, transactions, accMonth, accAllMonths, accTypeFilter, isTxModalOpen, editingTxId, txForm,
+                    accLedger, accIncome, accExpense, accProfit, accIncomeFromOrders, accExpenseCount,
+                    accExpenseBreakdown, accChart, shiftAccMonth, txCategoryOptions, setTxType,
+                    openTxModal, closeTxModal, saveTx, deleteTx, exportAccountingCSV
                 };
             }
         }).mount('#app');
