@@ -289,6 +289,26 @@
             </div>
         </div>
 
+        <div v-if="cardMenuOrder" class="md:hidden fixed inset-0 z-50 flex items-end bg-slate-900/50 no-print" @click.self="cardMenuOrder = null">
+            <div class="w-full bg-white rounded-t-3xl" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
+                <div class="pt-2.5 pb-1 flex justify-center"><div class="w-10 h-1 rounded-full bg-slate-300"></div></div>
+                <div class="px-4 pb-2 text-sm font-bold text-slate-900 truncate">{{ cardMenuOrder.customerName }}</div>
+                <div class="px-2 pb-3">
+                    <button @click="runCardMenu('print')" class="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm text-slate-700 active:bg-slate-50 text-left">
+                        <i class="fa-solid fa-print w-5 text-center text-pink-600"></i> พิมพ์ใบสั่งงาน
+                    </button>
+                    <button v-if="cardMenuOrder.deliveryType === 'shipping'" @click="runCardMenu('tracking')" class="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm text-slate-700 active:bg-slate-50 text-left">
+                        <i class="fa-solid fa-truck-fast w-5 text-center text-sky-600"></i> แจ้งเลขพัสดุ
+                    </button>
+                    <div class="my-1 border-t border-slate-100"></div>
+                    <button @click="runCardMenu('delete')" class="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm text-rose-600 active:bg-rose-50 text-left">
+                        <i class="fa-solid fa-trash-can w-5 text-center"></i> ลบออเดอร์
+                    </button>
+                    <button @click="cardMenuOrder = null" class="w-full mt-1 py-3.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">ปิด</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Header Bar & Dashboard -->
         <header class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-5 mb-3 sm:mb-6 no-print">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -465,7 +485,7 @@
                 
                 <!-- Urgent Banner -->
                 <div v-if="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' && order.status !== 'cancelled'"
-                     class="bg-rose-600 text-white font-bold text-xs px-4 py-2 flex items-center justify-between tracking-wide shadow-sm">
+                     class="bg-rose-600 text-white font-bold text-xs px-4 py-2 hidden md:flex items-center justify-between tracking-wide shadow-sm">
                     <span class="flex items-center gap-1.5">
                         <i class="fa-solid fa-triangle-exclamation text-sm animate-bounce"></i>
                         <span>{{ getDeliveryUrgency(order).text }}</span>
@@ -473,7 +493,7 @@
                     <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">ด่วนมาก</span>
                 </div>
                 <div v-else-if="getDeliveryUrgency(order).type === 'today' && order.status !== 'completed' && order.status !== 'cancelled'"
-                     class="bg-amber-500 text-slate-900 font-bold text-xs px-4 py-2 flex items-center justify-between tracking-wide shadow-sm">
+                     class="bg-amber-500 text-slate-900 font-bold text-xs px-4 py-2 hidden md:flex items-center justify-between tracking-wide shadow-sm">
                     <span class="flex items-center gap-1.5">
                         <i class="fa-solid fa-fire text-sm animate-pulse"></i>
                         <span>{{ getDeliveryUrgency(order).text }}</span>
@@ -482,13 +502,13 @@
                 </div>
 
                 <div>
-                    <div class="p-4 sm:p-5 border-b border-slate-100/80 relative">
-                        <div class="flex items-center justify-between gap-2 mb-3">
+                    <div class="p-3 sm:p-5 border-b border-slate-100/80 relative">
+                        <div class="flex items-center justify-between gap-2 mb-2 sm:mb-3">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <!-- Print Selection Checkbox -->
-                                <label class="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded-lg">
-                                    <input type="checkbox" :value="order.id" v-model="selectedForPrint" class="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 cursor-pointer">
-                                    <span>เลือกพิมพ์</span>
+                                <label class="flex items-center gap-1.5 text-xs font-semibold cursor-pointer bg-slate-100 hover:bg-slate-200 px-2.5 py-2 md:px-2 md:py-1.5 rounded-lg">
+                                    <input type="checkbox" :value="order.id" v-model="selectedForPrint" class="rounded text-pink-600 focus:ring-pink-500 w-5 h-5 md:w-4 md:h-4 cursor-pointer">
+                                    <span class="hidden md:inline">เลือกพิมพ์</span>
                                 </label>
 
                                 <!-- Type Badge -->
@@ -510,7 +530,7 @@
                         </div>
 
                         <!-- Progress Bar -->
-                        <div v-if="order.status !== 'cancelled'" class="mt-3 mb-4 px-1 relative">
+                        <div v-if="order.status !== 'cancelled'" :class="isExpanded(order) ? '' : 'hidden md:block'" class="mt-3 mb-4 px-1 relative">
                             <div class="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1.5 bg-slate-200/70 rounded-full z-0"></div>
                             <div class="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full z-0 transition-all duration-500 ease-out" 
                                  :class="getProgressColor(order.status)"
@@ -525,7 +545,7 @@
                         </div>
 
                         <!-- Customer Name & Phone -->
-                        <h2 class="text-lg font-bold text-slate-900 group-hover:text-pink-600 transition-colors flex items-center justify-between mt-2">
+                        <h2 class="text-base sm:text-lg font-bold text-slate-900 group-hover:text-pink-600 transition-colors flex items-center justify-between mt-2">
                             <span class="truncate">{{ order.customerName }}</span>
                             <a v-if="order.customerPhone" :href="'tel:' + order.customerPhone" title="กดเพื่อโทรออก" class="text-xs text-pink-600 hover:text-pink-700 bg-pink-50 px-2 py-1 rounded-lg border border-pink-100 shrink-0 font-medium">
                                 <i class="fa-solid fa-phone text-[10px] mr-1"></i>{{ order.customerPhone }}
@@ -536,7 +556,7 @@
                     </div>
 
                     <!-- Card Body -->
-                    <div class="p-4 sm:p-5 space-y-4 text-sm">
+                    <div class="p-3 sm:p-5 space-y-3 sm:space-y-4 text-sm">
                         <!-- Products List -->
                         <div class="bg-white/70 rounded-xl p-3 border border-slate-200/70 shadow-2xs flex gap-3">
                             <button v-if="getOrderImages(order).length" @click="openGallery(order)" title="ดูรูปสินค้าทั้งหมด"
@@ -550,19 +570,38 @@
                                 </span>
                             </button>
                             <div class="min-w-0 flex-1">
-                                <div class="text-xs font-semibold text-slate-500 mb-1 flex items-center gap-1.5">
+                                <div class="text-xs font-semibold text-slate-500 mb-1 hidden md:flex items-center gap-1.5">
                                     <i class="fa-solid fa-layer-group text-slate-400"></i>
                                     <span>รายการสินค้า:</span>
                                 </div>
-                                <p class="text-slate-800 font-medium whitespace-pre-line leading-relaxed">{{ order.products }}</p>
-                                <p v-if="order.notes" class="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg mt-2 border border-amber-100">
+                                <p :class="isExpanded(order) ? '' : 'line-clamp-2 md:line-clamp-none'" class="text-slate-800 font-medium whitespace-pre-line leading-relaxed">{{ order.products }}</p>
+                                <p v-if="order.notes" :class="isExpanded(order) ? '' : 'hidden md:block'" class="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg mt-2 border border-amber-100">
                                     📌 <strong>หมายเหตุ:</strong> {{ order.notes }}
                                 </p>
                             </div>
                         </div>
 
+                        <!-- MOBILE summary (collapsed card) -->
+                        <div v-if="!isExpanded(order)" class="md:hidden flex items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="text-[11px] text-slate-400 leading-tight">กำหนดส่ง/นัดรับ</div>
+                                <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                    <span class="text-sm font-bold text-slate-800">{{ formatDate(order.deliveryDate) }}</span>
+                                    <span v-if="urgencyChip(order)" :class="urgencyChip(order).cls" class="px-2 py-0.5 rounded-full text-[11px] font-bold">{{ urgencyChip(order).text }}</span>
+                                    <span v-if="order.notes" class="px-1.5 py-0.5 rounded-full text-[11px] text-amber-700 bg-amber-50 border border-amber-100">📌 มีหมายเหตุ</span>
+                                </div>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <template v-if="getRemainingBalance(order) > 0">
+                                    <div class="text-[11px] text-slate-400 leading-tight">ค้างชำระ</div>
+                                    <div class="text-base font-bold text-rose-600">฿{{ formatNumber(getRemainingBalance(order)) }}</div>
+                                </template>
+                                <div v-else class="text-sm font-bold text-emerald-600">✓ ชำระครบแล้ว</div>
+                            </div>
+                        </div>
+
                         <!-- Dates -->
-                        <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div :class="isExpanded(order) ? '' : 'hidden md:grid'" class="grid grid-cols-2 gap-2 text-xs">
                             <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
                                 <span class="text-slate-400 block mb-0.5"><i class="fa-regular fa-calendar-check mr-1"></i>วันที่สั่ง</span>
                                 <span class="font-medium text-slate-700">{{ formatDate(order.orderDate) }}</span>
@@ -575,7 +614,7 @@
                         </div>
 
                         <!-- PARCEL SHIPPING DISPLAY -->
-                        <div v-if="order.deliveryType === 'shipping'" class="bg-sky-50/60 rounded-xl p-3 border border-sky-100 text-xs space-y-2">
+                        <div v-if="order.deliveryType === 'shipping'" :class="isExpanded(order) ? '' : 'hidden md:block'" class="bg-sky-50/60 rounded-xl p-3 border border-sky-100 text-xs space-y-2">
                             <div class="flex items-center justify-between font-bold text-sky-900 border-b border-sky-100 pb-1.5">
                                 <span class="flex items-center gap-1.5">
                                     <i class="fa-solid fa-box text-sky-600"></i>
@@ -607,7 +646,7 @@
                         </div>
 
                         <!-- STORE PICKUP DISPLAY -->
-                        <div v-else class="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 text-xs space-y-1.5">
+                        <div v-else :class="isExpanded(order) ? '' : 'hidden md:block'" class="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 text-xs space-y-1.5">
                             <div class="flex items-center justify-between gap-1 mb-1">
                                 <span class="font-bold text-indigo-900 flex items-center gap-1">
                                     <i class="fa-solid fa-location-dot text-indigo-600"></i>
@@ -629,7 +668,7 @@
                         </div>
 
                         <!-- Financial Summary -->
-                        <div class="rounded-xl border border-slate-200/80 p-3.5 bg-slate-50/70 space-y-2">
+                        <div :class="isExpanded(order) ? '' : 'hidden md:block'" class="rounded-xl border border-slate-200/80 p-3.5 bg-slate-50/70 space-y-2">
                             <div class="flex justify-between items-center text-xs text-slate-600">
                                 <span>ยอดรวมสินค้า:</span>
                                 <span class="font-semibold text-slate-800">฿{{ formatNumber(order.totalAmount) }}</span>
@@ -645,12 +684,30 @@
                                 </span>
                             </div>
                         </div>
+
+                        <button @click="toggleExpand(order)" class="md:hidden w-full py-2 text-xs font-semibold text-slate-500 flex items-center justify-center gap-1.5 border-t border-slate-200/60">
+                            <span>{{ isExpanded(order) ? 'ซ่อนรายละเอียด' : 'ดูรายละเอียด' }}</span>
+                            <i class="fa-solid text-[10px]" :class="isExpanded(order) ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
                     </div>
                 </div>
 
                 <!-- Card Actions -->
                 <div class="p-3 sm:p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1 flex-wrap">
+                    <!-- MOBILE actions: 2 main buttons + more menu -->
+                    <div class="md:hidden flex items-center gap-2 w-full">
+                        <button @click="openMessageModal(order)" class="flex-1 py-3 rounded-xl bg-orange-50 active:bg-orange-100 text-orange-700 text-sm font-semibold border border-orange-200 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-comment-dots"></i><span>แจ้งลูกค้า</span>
+                        </button>
+                        <button @click="openModal(order)" class="flex-1 py-3 rounded-xl bg-white active:bg-pink-50 text-pink-600 text-sm font-semibold border border-pink-200 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-pen-to-square"></i><span>แก้ไข</span>
+                        </button>
+                        <button @click="cardMenuOrder = order" title="เมนูเพิ่มเติม" class="w-12 h-12 shrink-0 rounded-xl bg-white active:bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </button>
+                    </div>
+
+                    <div class="hidden md:flex items-center gap-1 flex-wrap">
                         <button @click="printSingleWorkOrder(order)" title="พิมพ์ใบสั่งงาน" class="px-3 py-2.5 sm:px-2.5 sm:py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-700 text-xs font-medium border border-pink-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs">
                             <i class="fa-solid fa-print"></i>
                             <span>ใบสั่งงาน</span>
@@ -665,7 +722,7 @@
                         </button>
                     </div>
                     
-                    <div class="flex items-center gap-1">
+                    <div class="hidden md:flex items-center gap-1">
                         <button @click="openModal(order)" title="แก้ไขออเดอร์" class="p-2.5 sm:p-2 hover:bg-pink-50 text-pink-600 rounded-lg transition-colors">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
@@ -1637,6 +1694,26 @@
                 const currentView = ref('grid');
                 const isFilterSheetOpen = ref(false);
                 const isMobileMenuOpen = ref(false);
+                // Mobile order cards start collapsed; expanded state is per order id (desktop always shows everything via md: classes)
+                const expandedIds = ref({});
+                function isExpanded(order) { return !!expandedIds.value[order.id]; }
+                function toggleExpand(order) { expandedIds.value = { ...expandedIds.value, [order.id]: !expandedIds.value[order.id] }; }
+                const cardMenuOrder = ref(null);
+                function runCardMenu(action) {
+                    const o = cardMenuOrder.value;
+                    cardMenuOrder.value = null;
+                    if (!o) return;
+                    if (action === 'print') printSingleWorkOrder(o);
+                    else if (action === 'tracking') openTrackingModal(o);
+                    else if (action === 'delete') confirmDelete(o);
+                }
+                function urgencyChip(order) {
+                    const u = getDeliveryUrgency(order);
+                    if (!u.text) return null; // finished orders have no urgency
+                    if (u.type === 'overdue') return { text: u.text.replace('!', ''), cls: 'bg-rose-600 text-white' };
+                    if (u.type === 'today') return { text: '⚡️ วันนี้', cls: 'bg-amber-400 text-slate-900' };
+                    return { text: u.text, cls: 'bg-slate-100 text-slate-600' };
+                }
                 const activeFilterCount = computed(() =>
                     (filterType.value !== 'all' ? 1 : 0) + (datePreset.value !== 'all' ? 1 : 0) + (sortBy.value !== 'delivery_asc' ? 1 : 0));
                 function resetFilters() { filterType.value = 'all'; datePreset.value = 'all'; sortBy.value = 'delivery_asc'; }
@@ -2965,6 +3042,7 @@
                 return {
                     orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
                     isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
+                    isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip,
                     isModalOpen, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
                     filteredOrders, activeOrdersCount, statusCounts, completedCount, cancelledCount, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
