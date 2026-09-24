@@ -600,6 +600,21 @@
                             </div>
                         </div>
 
+                        <!-- MOBILE quick actions (collapsed card): tracking / map -->
+                        <a v-if="!isExpanded(order) && order.deliveryType === 'shipping' && order.trackingNumber" :href="trackingUrl(order)" target="_blank" rel="noopener"
+                           class="md:hidden w-full py-3 rounded-xl bg-sky-600 active:bg-sky-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                            <span>ติดตามพัสดุ</span>
+                            <span class="font-mono text-xs opacity-80 tracking-wide">{{ order.trackingNumber }}</span>
+                        </a>
+                        <a v-if="!isExpanded(order) && order.deliveryType !== 'shipping' && order.lat && order.lng"
+                           :href="`https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`" target="_blank" rel="noopener"
+                           class="md:hidden w-full py-3 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-diamond-turn-right"></i>
+                            <span>เปิดแผนที่ Google Maps</span>
+                            <span v-if="getDistance(order) !== null" class="text-xs opacity-80">📍 {{ getDistance(order) }} กม.</span>
+                        </a>
+
                         <!-- Dates -->
                         <div :class="isExpanded(order) ? '' : 'hidden md:grid'" class="grid grid-cols-2 gap-2 text-xs">
                             <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
