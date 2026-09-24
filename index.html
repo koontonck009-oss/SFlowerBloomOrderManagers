@@ -322,8 +322,8 @@
 
                 <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs w-full sm:w-auto -mx-3 px-3 sm:mx-0 sm:px-0">
                     <span class="text-slate-400 font-semibold mr-1 shrink-0"><i class="fa-solid fa-filter"></i> สถานะ:</span>
-                    <button @click="statusFilter = 'all'" :class="statusFilter === 'all' ? 'bg-slate-800 text-white font-medium' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
-                        ทั้งหมด
+                    <button @click="statusFilter = 'active'" :class="statusFilter === 'active' ? 'bg-slate-800 text-white font-medium' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        ที่ต้องทำ ({{ activeOrdersCount }})
                     </button>
                     <button @click="statusFilter = 'pending'" :class="statusFilter === 'pending' ? 'bg-amber-500 text-white font-medium' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
                         🟡 รอดำเนินการ
@@ -335,7 +335,13 @@
                         🟣 พร้อมส่ง/รับ
                     </button>
                     <button @click="statusFilter = 'completed'" :class="statusFilter === 'completed' ? 'bg-emerald-500 text-white font-medium' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
-                        🟢 ส่งสำเร็จ
+                        🟢 ส่งสำเร็จ ({{ completedCount }})
+                    </button>
+                    <button @click="statusFilter = 'cancelled'" :class="statusFilter === 'cancelled' ? 'bg-rose-500 text-white font-medium' : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        🔴 ยกเลิก ({{ cancelledCount }})
+                    </button>
+                    <button @click="statusFilter = 'all'" :class="statusFilter === 'all' ? 'bg-slate-800 text-white font-medium' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
+                        ดูทั้งหมด ({{ orders.length }})
                     </button>
                 </div>
             </div>
@@ -662,6 +668,7 @@
             </div>
             <h3 class="text-lg font-bold text-slate-800">ไม่พบข้อมูลออเดอร์</h3>
             <p class="text-slate-500 text-sm mt-1 max-w-md mx-auto">ยังไม่มีรายการออเดอร์ที่ตรงกับเงื่อนไข สามารถกดปุ่ม "สร้างออเดอร์ใหม่" เพื่อเพิ่มข้อมูลได้ครับ</p>
+            <p v-if="statusFilter === 'active' && orders.length > 0" class="text-slate-500 text-sm mt-2">ไม่มีออเดอร์ที่ต้องทำ — ออเดอร์ที่ส่งสำเร็จ/ยกเลิกดูได้ที่ปุ่มสถานะด้านบน</p>
             <button @click="openModal()" class="mt-4 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-xl text-sm transition-all shadow-sm inline-flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i> เพิ่มออเดอร์แรก
             </button>
@@ -1513,7 +1520,7 @@
                 const orders = ref([]);
                 const searchQuery = ref('');
                 const filterType = ref('all');
-                const statusFilter = ref('all');
+                const statusFilter = ref('active'); // default: hide completed/cancelled orders
                 const datePreset = ref('all');
                 const sortBy = ref('delivery_asc');
                 const currentView = ref('grid');
@@ -1694,6 +1701,10 @@
                     return { type: 'normal', text: `อีก ${diffDays} วัน`, cardClass: 'bg-white border-slate-200/90' };
                 }
 
+                function isFinishedStatus(status) { return status === 'completed' || status === 'cancelled'; }
+                const activeOrdersCount = computed(() => orders.value.filter(o => !isFinishedStatus(o.status)).length);
+                const completedCount = computed(() => orders.value.filter(o => o.status === 'completed').length);
+                const cancelledCount = computed(() => orders.value.filter(o => o.status === 'cancelled').length);
                 const pendingCount = computed(() => orders.value.filter(o => o.status === 'pending' || o.status === 'in_progress').length);
                 const pickupCount = computed(() => orders.value.filter(o => o.deliveryType === 'pickup').length);
                 const shippingCount = computed(() => orders.value.filter(o => o.deliveryType === 'shipping').length);
@@ -1738,7 +1749,12 @@
                         const q = searchQuery.value.toLowerCase().trim();
                         const matchesSearch = !q || order.customerName.toLowerCase().includes(q) || order.products.toLowerCase().includes(q) || (order.customerPhone && order.customerPhone.includes(q)) || (order.trackingNumber && order.trackingNumber.toLowerCase().includes(q));
                         let matchesFilter = filterType.value === 'all' || order.deliveryType === filterType.value;
-                        let matchesStatus = statusFilter.value === 'all' || order.status === statusFilter.value;
+                        // 'active' = everything not completed/cancelled. While searching, look across every status
+                        // so an older (hidden) order can still be found by name/phone/tracking number.
+                        let matchesStatus = statusFilter.value === 'all'
+                            || (statusFilter.value === 'active'
+                                ? (q !== '' || !isFinishedStatus(order.status))
+                                : order.status === statusFilter.value);
                         let matchesDate = datePreset.value === 'all' || (datePreset.value === 'today' && order.deliveryDate === todayStr) || (datePreset.value === 'tomorrow' && order.deliveryDate === tomorrowStr) || (datePreset.value === 'overdue' && getDeliveryUrgency(order).type === 'overdue');
                         return matchesSearch && matchesFilter && matchesStatus && matchesDate;
                     }).sort((a, b) => {
@@ -1792,6 +1808,11 @@
                         statusUpdate.completedAt = '';
                     }
                     order.completedAt = statusUpdate.completedAt !== undefined ? statusUpdate.completedAt : order.completedAt;
+                    if (statusFilter.value === 'active' && isFinishedStatus(newStatus)) {
+                        // The card is about to leave this view — drop it from the print selection and tell the user where it went
+                        selectedForPrint.value = selectedForPrint.value.filter(id => id !== order.id);
+                        showToast(newStatus === 'completed' ? 'ย้ายไปที่ "ส่งสำเร็จ" แล้ว' : 'ย้ายไปที่ "ยกเลิก" แล้ว');
+                    }
                     db.collection('orders').doc(order.id).update(statusUpdate)
                         .catch(() => showToast('อัปเดตสถานะไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     showToast('อัปเดตสถานะเรียบร้อย');
@@ -2823,7 +2844,7 @@
                     orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
                     isModalOpen, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
-                    filteredOrders, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
+                    filteredOrders, activeOrdersCount, completedCount, cancelledCount, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
                     openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
                     getRemainingBalance, getDeliveryUrgency, getDistance, formatNumber, formatDate, getStatusClass,
