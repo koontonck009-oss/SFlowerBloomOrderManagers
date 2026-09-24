@@ -43,10 +43,11 @@
         }
     </script>
     <style>
-        html, body {
-            overflow-x: hidden;
-            max-width: 100vw;
-        }
+        html { overflow-x: hidden; max-width: 100vw; }
+        /* clip (not hidden) so body does not become a scroll container — that would break position:sticky */
+        body { overflow-x: clip; max-width: 100vw; }
+        .hide-scrollbar { scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
         body {
             font-family: 'Prompt', 'Sarabun', sans-serif;
             background-color: #f8fafc;
@@ -148,7 +149,7 @@
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-12">
 
-    <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 md:pt-6 pb-16 md:pb-0">
 
         <!-- Loading state while Firebase reports auth status -->
         <div v-if="!authChecked" class="min-h-[80vh] flex items-center justify-center">
@@ -184,10 +185,114 @@
         <!-- Main App (only rendered once logged in) -->
         <div v-else>
 
+        <!-- ===== MOBILE: top bar, bottom nav, FAB, filter sheet (md:hidden) ===== -->
+        <div class="md:hidden flex items-center justify-between mb-3 no-print relative">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-sm text-lg">🌸</div>
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-slate-900 leading-tight truncate">S.FLOWER BLOOM</div>
+                    <div class="text-[11px] text-slate-500 leading-tight">จัดการออเดอร์</div>
+                </div>
+            </div>
+            <button @click="isMobileMenuOpen = !isMobileMenuOpen" title="เมนู" class="w-10 h-10 shrink-0 rounded-xl bg-white border border-slate-200 text-slate-600 flex items-center justify-center shadow-sm">
+                <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+            <div v-show="isMobileMenuOpen" class="fixed inset-0 z-40" @click="isMobileMenuOpen = false"></div>
+            <div v-show="isMobileMenuOpen" class="absolute right-0 top-12 z-50 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-1.5">
+                <button @click="openStoreModal(); isMobileMenuOpen = false" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-700 hover:bg-slate-50 text-left">
+                    <i class="fa-solid fa-store w-5 text-center text-indigo-500"></i>
+                    <span class="truncate">ตำแหน่งร้าน: {{ storeLocation.name }}</span>
+                </button>
+                <button @click="exportDataJSON(); isMobileMenuOpen = false" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-700 hover:bg-slate-50 text-left">
+                    <i class="fa-solid fa-file-export w-5 text-center text-slate-500"></i> ส่งออกข้อมูลสำรอง (Export)
+                </button>
+                <label class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <i class="fa-solid fa-file-import w-5 text-center text-slate-500"></i> นำเข้าข้อมูล (Import)
+                    <input type="file" @change="importDataJSON($event); isMobileMenuOpen = false" accept=".json" class="hidden">
+                </label>
+                <div class="my-1 border-t border-slate-100"></div>
+                <button @click="isMobileMenuOpen = false; handleLogout()" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-rose-600 hover:bg-rose-50 text-left">
+                    <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> ออกจากระบบ
+                </button>
+            </div>
+        </div>
+
+        <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 no-print" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
+            <div class="grid grid-cols-2">
+                <button @click="mainTab = 'orders'" :class="mainTab === 'orders' ? 'text-pink-600' : 'text-slate-400'" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px] font-semibold">
+                    <span class="relative">
+                        <i class="fa-solid fa-clipboard-list text-xl"></i>
+                        <span v-if="activeOrdersCount > 0" class="absolute -top-1.5 -right-3.5 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-600 text-white text-[10px] font-bold flex items-center justify-center">{{ activeOrdersCount }}</span>
+                    </span>
+                    ออเดอร์
+                </button>
+                <button @click="mainTab = 'accounting'" :class="mainTab === 'accounting' ? 'text-pink-600' : 'text-slate-400'" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px] font-semibold">
+                    <i class="fa-solid fa-wallet text-xl"></i>
+                    บัญชี
+                </button>
+            </div>
+        </nav>
+
+        <button v-if="mainTab === 'orders'" @click="openModal()" title="สร้างออเดอร์ใหม่" class="md:hidden fixed right-4 bottom-20 z-40 w-14 h-14 rounded-full bg-pink-600 active:bg-pink-700 text-white shadow-lg shadow-pink-600/30 flex items-center justify-center no-print">
+            <i class="fa-solid fa-plus text-xl"></i>
+        </button>
+
+        <div v-if="mainTab === 'orders' && selectedForPrint.length > 0" class="md:hidden fixed left-4 right-24 bottom-20 z-40 flex items-center gap-2 no-print">
+            <button @click="openBatchPrintModal" class="flex-1 min-w-0 py-3 rounded-full bg-slate-900 text-white text-sm font-semibold shadow-lg flex items-center justify-center gap-2">
+                <i class="fa-solid fa-print"></i><span class="truncate">พิมพ์ใบสั่งงาน ({{ selectedForPrint.length }})</span>
+            </button>
+            <button @click="selectedForPrint = []" title="ล้างที่เลือก" class="w-11 h-11 shrink-0 rounded-full bg-white border border-slate-200 text-slate-500 shadow flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div v-if="isFilterSheetOpen" class="md:hidden fixed inset-0 z-50 flex items-end bg-slate-900/50 no-print" @click.self="isFilterSheetOpen = false">
+            <div class="w-full bg-white rounded-t-3xl max-h-[85vh] flex flex-col" style="padding-bottom: env(safe-area-inset-bottom, 0px)">
+                <div class="pt-2.5 pb-1 flex justify-center"><div class="w-10 h-1 rounded-full bg-slate-300"></div></div>
+                <div class="flex items-center justify-between px-4 pb-2">
+                    <h3 class="text-base font-bold text-slate-900">ตัวกรอง</h3>
+                    <button @click="isFilterSheetOpen = false" class="w-10 h-10 -mr-2 flex items-center justify-center text-slate-500"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="overflow-y-auto px-4 pb-4 space-y-5">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-500 mb-2">เรียงตาม</div>
+                        <div class="space-y-1.5">
+                            <button v-for="o in [{v:'delivery_asc',t:'🚨 ด่วนสุด (กำหนดส่งใกล้นี้)'},{v:'created_desc',t:'🆕 ออเดอร์ใหม่ล่าสุด'},{v:'remaining_desc',t:'💰 ยอดค้างชำระ (มากไปน้อย)'},{v:'distance_asc',t:'📍 นัดรับใกล้ที่สุดก่อน (กม.)'}]" :key="o.v" @click="sortBy = o.v"
+                                    :class="sortBy === o.v ? 'border-pink-500 bg-pink-50 text-pink-700 font-semibold' : 'border-slate-200 bg-white text-slate-700'"
+                                    class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-sm text-left">
+                                <span>{{ o.t }}</span>
+                                <i v-if="sortBy === o.v" class="fa-solid fa-check text-pink-600"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-slate-500 mb-2">ช่วงเวลาส่ง</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button v-for="o in [{v:'all',t:'📅 ทุกช่วงเวลา'},{v:'today',t:'⚡️ วันนี้'},{v:'tomorrow',t:'⏳ พรุ่งนี้'},{v:'overdue',t:'🚨 เกินกำหนด'}]" :key="o.v" @click="datePreset = o.v"
+                                    :class="datePreset === o.v ? 'border-pink-500 bg-pink-50 text-pink-700 font-semibold' : 'border-slate-200 bg-white text-slate-700'"
+                                    class="px-3 py-3 rounded-xl border text-sm">{{ o.t }}</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-slate-500 mb-2">ประเภทการรับสินค้า</div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button v-for="o in [{v:'all',t:'ทั้งหมด'},{v:'shipping',t:'📦 พัสดุ'},{v:'pickup',t:'🏪 นัดรับ'}]" :key="o.v" @click="filterType = o.v"
+                                    :class="filterType === o.v ? 'border-pink-500 bg-pink-50 text-pink-700 font-semibold' : 'border-slate-200 bg-white text-slate-700'"
+                                    class="px-2 py-3 rounded-xl border text-sm">{{ o.t }}</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-t border-slate-100 flex items-center gap-2">
+                    <button @click="resetFilters()" class="px-4 py-3 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">ล้าง</button>
+                    <button @click="isFilterSheetOpen = false" class="flex-1 py-3 rounded-xl bg-pink-600 active:bg-pink-700 text-white text-sm font-semibold">แสดงผลลัพธ์ ({{ filteredOrders.length }})</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Header Bar & Dashboard -->
-        <header class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 sm:p-5 mb-4 sm:mb-6 no-print">
+        <header class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-5 mb-3 sm:mb-6 no-print">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div class="flex items-center gap-3">
+                <div class="hidden md:flex items-center gap-3">
                     <div class="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center text-white shadow-md shadow-pink-500/20 text-lg sm:text-xl font-bold">
                         🌸
                     </div>
@@ -197,7 +302,7 @@
                     </div>
                 </div>
 
-                <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full md:w-auto">
+                <div class="hidden md:flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full md:w-auto">
                     <button @click="openModal()" class="w-full sm:w-auto px-4 py-3 sm:py-2 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 text-sm">
                         <i class="fa-solid fa-plus text-sm"></i>
                         <span>สร้างออเดอร์ใหม่</span>
@@ -233,20 +338,20 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-slate-100">
-                <div class="bg-slate-50 rounded-xl p-2.5 sm:p-3 border border-slate-100">
+            <div class="flex gap-2.5 overflow-x-auto hide-scrollbar md:overflow-visible md:grid md:grid-cols-4 md:gap-3 md:mt-6 md:pt-5 md:border-t border-slate-100">
+                <div class="bg-slate-50 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-slate-100">
                     <span class="text-[11px] sm:text-xs font-medium text-slate-500 block">ออเดอร์ทั้งหมด</span>
                     <span class="text-lg sm:text-xl font-bold text-slate-800">{{ orders.length }} <span class="text-xs font-normal text-slate-500">รายการ</span></span>
                 </div>
-                <div class="bg-amber-50/60 rounded-xl p-2.5 sm:p-3 border border-amber-100/80">
+                <div class="bg-amber-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-amber-100/80">
                     <span class="text-[11px] sm:text-xs font-medium text-amber-700 block">รอส่งพัสดุ / นัดรับ</span>
                     <span class="text-lg sm:text-xl font-bold text-amber-800">{{ pendingCount }} <span class="text-xs font-normal text-amber-600">รายการ</span></span>
                 </div>
-                <div class="bg-emerald-50/60 rounded-xl p-2.5 sm:p-3 border border-emerald-100/80">
+                <div class="bg-emerald-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-emerald-100/80">
                     <span class="text-[11px] sm:text-xs font-medium text-emerald-700 block">ยอดรวมมัดจำแล้ว</span>
                     <span class="text-lg sm:text-xl font-bold text-emerald-800">฿{{ formatNumber(totalDepositSum) }}</span>
                 </div>
-                <div class="bg-rose-50/60 rounded-xl p-2.5 sm:p-3 border border-rose-100/80">
+                <div class="bg-rose-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-rose-100/80">
                     <span class="text-[11px] sm:text-xs font-medium text-rose-700 block">ยอดค้างชำระรวม</span>
                     <span class="text-lg sm:text-xl font-bold text-rose-800">฿{{ formatNumber(totalRemainingSum) }}</span>
                 </div>
@@ -254,7 +359,7 @@
         </header>
 
         <!-- Main tab switcher -->
-        <div class="flex items-center gap-1 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-1.5 mb-4 sm:mb-6 no-print">
+        <div class="hidden md:flex items-center gap-1 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-1.5 mb-4 sm:mb-6 no-print">
             <button @click="mainTab = 'orders'" :class="mainTab === 'orders' ? 'bg-pink-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'" class="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-clipboard-list"></i> ออเดอร์
             </button>
@@ -264,17 +369,23 @@
         </div>
 
         <div v-show="mainTab === 'orders'">
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-3 sm:p-4 mb-4 sm:mb-6 flex flex-col gap-3 sm:gap-4 no-print">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-2.5 sm:p-4 mb-3 sm:mb-6 flex flex-col gap-2 sm:gap-4 no-print sticky top-0 z-30 md:static">
             <div class="flex flex-col lg:flex-row justify-between items-center gap-3 sm:gap-4">
                 <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
                     <!-- Search Input -->
-                    <div class="relative w-full sm:w-72">
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <div class="relative flex-1 min-w-0 sm:flex-none sm:w-72">
                         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                         <input v-model="searchQuery" type="search" placeholder="ค้นหาชื่อลูกค้า, สินค้า, เบอร์, เลขพัสดุ..." class="w-full pl-10 pr-4 py-2.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all">
                     </div>
+                    <button @click="isFilterSheetOpen = true" title="ตัวกรอง" class="md:hidden relative shrink-0 w-11 h-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span v-if="activeFilterCount > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-600 text-white text-[10px] font-bold flex items-center justify-center">{{ activeFilterCount }}</span>
+                    </button>
+                    </div>
 
                     <!-- Sort Select Dropdown -->
-                    <div class="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                    <div class="hidden md:flex items-center gap-2 w-full sm:w-auto shrink-0">
                         <span class="text-xs font-semibold text-slate-500 whitespace-nowrap"><i class="fa-solid fa-arrow-down-wide-short text-pink-600"></i> เรียงตาม:</span>
                         <select v-model="sortBy" class="w-full sm:w-auto py-2.5 sm:py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer shadow-sm">
                             <option value="delivery_asc">🚨 ด่วนสุด (กำหนดส่งใกล้นี้)</option>
@@ -286,7 +397,7 @@
                 </div>
 
                 <!-- View Switcher & Date Preset Filter -->
-                <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+                <div class="hidden md:flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
                     <select v-model="datePreset" class="flex-1 sm:flex-initial py-2.5 sm:py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer">
                         <option value="all">📅 ทุกช่วงเวลาส่ง</option>
                         <option value="today">⚡️ นัดส่ง/รับ วันนี้</option>
@@ -307,8 +418,8 @@
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs w-full sm:w-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div class="flex flex-wrap items-center justify-between gap-3 md:border-t border-slate-100 md:pt-3">
+                <div class="hidden md:flex items-center gap-1.5 overflow-x-auto pb-1 text-xs w-full sm:w-auto -mx-3 px-3 sm:mx-0 sm:px-0">
                     <button @click="filterType = 'all'" :class="filterType === 'all' ? 'bg-slate-900 text-white font-medium' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-2 sm:py-1.5 rounded-lg whitespace-nowrap transition-colors">
                         ทั้งหมด ({{ orders.length }})
                     </button>
@@ -320,19 +431,19 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs w-full sm:w-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-                    <span class="text-slate-400 font-semibold mr-1 shrink-0"><i class="fa-solid fa-filter"></i> สถานะ:</span>
+                <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5 md:pb-1 text-xs w-full sm:w-auto -mx-2.5 px-2.5 sm:mx-0 sm:px-0">
+                    <span class="hidden md:inline text-slate-400 font-semibold mr-1 shrink-0"><i class="fa-solid fa-filter"></i> สถานะ:</span>
                     <button @click="statusFilter = 'active'" :class="statusFilter === 'active' ? 'bg-slate-800 text-white font-medium' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
                         ที่ต้องทำ ({{ activeOrdersCount }})
                     </button>
                     <button @click="statusFilter = 'pending'" :class="statusFilter === 'pending' ? 'bg-amber-500 text-white font-medium' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
-                        🟡 รอดำเนินการ
+                        🟡 รอดำเนินการ ({{ statusCounts.pending }})
                     </button>
                     <button @click="statusFilter = 'in_progress'" :class="statusFilter === 'in_progress' ? 'bg-sky-500 text-white font-medium' : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
-                        🔵 กำลังทำ
+                        🔵 กำลังทำ ({{ statusCounts.in_progress }})
                     </button>
                     <button @click="statusFilter = 'ready'" :class="statusFilter === 'ready' ? 'bg-indigo-500 text-white font-medium' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
-                        🟣 พร้อมส่ง/รับ
+                        🟣 พร้อมส่ง/รับ ({{ statusCounts.ready }})
                     </button>
                     <button @click="statusFilter = 'completed'" :class="statusFilter === 'completed' ? 'bg-emerald-500 text-white font-medium' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'" class="px-2.5 py-1.5 rounded-full whitespace-nowrap transition-colors">
                         🟢 ส่งสำเร็จ ({{ completedCount }})
@@ -1524,6 +1635,12 @@
                 const datePreset = ref('all');
                 const sortBy = ref('delivery_asc');
                 const currentView = ref('grid');
+                const isFilterSheetOpen = ref(false);
+                const isMobileMenuOpen = ref(false);
+                const activeFilterCount = computed(() =>
+                    (filterType.value !== 'all' ? 1 : 0) + (datePreset.value !== 'all' ? 1 : 0) + (sortBy.value !== 'delivery_asc' ? 1 : 0));
+                function resetFilters() { filterType.value = 'all'; datePreset.value = 'all'; sortBy.value = 'delivery_asc'; }
+                watch(isFilterSheetOpen, (open) => { document.body.style.overflow = open ? 'hidden' : ''; });
                 
                 const isModalOpen = ref(false);
                 const isStoreModalOpen = ref(false);
@@ -1703,6 +1820,11 @@
 
                 function isFinishedStatus(status) { return status === 'completed' || status === 'cancelled'; }
                 const activeOrdersCount = computed(() => orders.value.filter(o => !isFinishedStatus(o.status)).length);
+                const statusCounts = computed(() => {
+                    const c = { pending: 0, in_progress: 0, ready: 0 };
+                    orders.value.forEach(o => { if (c[o.status] !== undefined) c[o.status]++; });
+                    return c;
+                });
                 const completedCount = computed(() => orders.value.filter(o => o.status === 'completed').length);
                 const cancelledCount = computed(() => orders.value.filter(o => o.status === 'cancelled').length);
                 const pendingCount = computed(() => orders.value.filter(o => o.status === 'pending' || o.status === 'in_progress').length);
@@ -2842,9 +2964,10 @@
 
                 return {
                     orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
+                    isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
                     isModalOpen, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
-                    filteredOrders, activeOrdersCount, completedCount, cancelledCount, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
+                    filteredOrders, activeOrdersCount, statusCounts, completedCount, cancelledCount, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
                     openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
                     getRemainingBalance, getDeliveryUrgency, getDistance, formatNumber, formatDate, getStatusClass,
