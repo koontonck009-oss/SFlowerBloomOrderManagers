@@ -298,6 +298,9 @@
                 <div class="pt-2.5 pb-1 flex justify-center"><div class="w-10 h-1 rounded-full bg-slate-300"></div></div>
                 <div class="px-4 pb-2 text-sm font-bold text-slate-900 truncate">{{ cardMenuOrder.customerName }}</div>
                 <div class="px-2 pb-3">
+                    <button @click="runCardMenu('addItem')" class="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm text-slate-700 active:bg-slate-50 text-left">
+                        <i class="fa-solid fa-cart-plus w-5 text-center text-emerald-600"></i> เพิ่มสินค้า
+                    </button>
                     <button @click="runCardMenu('print')" class="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-sm text-slate-700 active:bg-slate-50 text-left">
                         <i class="fa-solid fa-print w-5 text-center text-pink-600"></i> พิมพ์ใบสั่งงาน
                     </button>
@@ -311,6 +314,66 @@
                     <button @click="cardMenuOrder = null" class="w-full mt-1 py-3.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">ปิด</button>
                 </div>
             </div>
+        </div>
+
+
+        <!-- Quick-edit sheet: fill one missing detail without opening the full form -->
+        <div v-if="quickEdit && quickOrder" class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/50 no-print" @click.self="closeQuickEdit">
+            <form @submit.prevent="saveQuickEdit" class="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto" style="padding-bottom: max(16px, env(safe-area-inset-bottom));">
+                <div class="pt-2.5 pb-1 flex justify-center sm:hidden"><div class="w-10 h-1 rounded-full bg-slate-300"></div></div>
+                <div class="px-4 sm:px-5 pt-2 sm:pt-4 pb-3 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="text-base font-bold text-slate-900">{{ quickTitle }}</div>
+                        <div class="text-xs text-slate-500 truncate">{{ quickOrder.customerName }}</div>
+                    </div>
+                    <button type="button" @click="closeQuickEdit" class="p-2 -m-2 text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="px-4 sm:px-5 space-y-3">
+                    <!-- phone -->
+                    <input v-if="quickEdit.type === 'phone'" ref="quickInput" v-model="quickForm.text" type="tel" inputmode="tel" autocomplete="off" placeholder="เช่น 081-234-5678" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+
+                    <!-- address -->
+                    <textarea v-else-if="quickEdit.type === 'address'" ref="quickInput" v-model="quickForm.text" rows="4" :placeholder="quickOrder.deliveryType === 'shipping' ? 'ที่อยู่ผู้รับ...' : 'สถานที่นัดรับ...'" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500"></textarea>
+
+                    <!-- delivery date -->
+                    <div v-else-if="quickEdit.type === 'date'" class="space-y-2">
+                        <input ref="quickInput" v-model="quickForm.date" type="date" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                        <button v-if="quickForm.date" type="button" @click="quickForm.date = ''" class="text-xs text-slate-500 underline">ล้างวันที่ (ยังไม่กำหนด)</button>
+                    </div>
+
+                    <!-- payment -->
+                    <div v-else-if="quickEdit.type === 'payment'" class="space-y-3">
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                            <div class="bg-slate-50 rounded-xl p-2"><div class="text-slate-400">ยอดรวม</div><div class="font-bold text-slate-800">฿{{ formatNumber(quickPay.total) }}</div></div>
+                            <div class="bg-slate-50 rounded-xl p-2"><div class="text-slate-400">ชำระแล้ว</div><div class="font-bold text-emerald-600">฿{{ formatNumber(quickPay.cur) }}</div></div>
+                            <div class="bg-slate-50 rounded-xl p-2"><div class="text-slate-400">คงเหลือ</div><div class="font-bold" :class="quickPay.curRemaining > 0 ? 'text-rose-600' : 'text-emerald-600'">฿{{ formatNumber(quickPay.curRemaining) }}</div></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+                            <button type="button" @click="quickForm.mode = 'add'" class="py-2 rounded-lg" :class="quickForm.mode === 'add' ? 'bg-white shadow-sm text-pink-600' : 'text-slate-500'">ลูกค้าโอนเพิ่ม</button>
+                            <button type="button" @click="quickForm.mode = 'set'" class="py-2 rounded-lg" :class="quickForm.mode === 'set' ? 'bg-white shadow-sm text-pink-600' : 'text-slate-500'">แก้ยอดที่ชำระแล้ว</button>
+                        </div>
+                        <input ref="quickInput" v-model="quickForm.amount" type="number" inputmode="decimal" step="any" :placeholder="quickForm.mode === 'add' ? 'ลูกค้าโอนเพิ่มกี่บาท' : 'ยอดที่ชำระแล้วทั้งหมด (บาท)'" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-semibold">
+                        <button v-if="quickPay.curRemaining > 0" type="button" @click="quickPayFull" class="w-full py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 text-sm font-semibold">✓ ชำระครบ (฿{{ formatNumber(quickPay.curRemaining) }})</button>
+                        <div v-if="quickPay.hasAmount" class="rounded-xl px-3.5 py-2.5 text-sm border" :class="quickPay.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-700'">
+                            <template v-if="quickPay.valid">หลังบันทึก: ชำระแล้ว <b>฿{{ formatNumber(quickPay.next) }}</b> · คงเหลือ <b>฿{{ formatNumber(quickPay.remaining) }}</b></template>
+                            <template v-else>ยอดที่ชำระแล้วติดลบไม่ได้</template>
+                        </div>
+                    </div>
+
+                    <!-- add product -->
+                    <div v-else-if="quickEdit.type === 'addItem'" class="space-y-3">
+                        <input ref="quickInput" v-model="quickForm.details" type="text" autocomplete="off" placeholder="รายการที่เพิ่ม เช่น ช่อทานตะวัน 1 ช่อ" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                        <input v-model="quickForm.price" type="number" inputmode="decimal" step="any" min="0" placeholder="ราคา (บาท)" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                        <div class="rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 text-slate-700">
+                            ยอดรวมจะเป็น <b>฿{{ formatNumber(quickNewTotal) }}</b> <span class="text-slate-400">(เดิม ฿{{ formatNumber(quickOrder.totalAmount) }})</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-3.5 rounded-xl bg-pink-600 active:bg-pink-700 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> บันทึก
+                    </button>
+                </div>
+            </form>
         </div>
 
         <!-- Header Bar & Dashboard -->
@@ -551,9 +614,13 @@
                         <!-- Customer Name & Phone -->
                         <h2 class="text-base sm:text-lg font-bold text-slate-900 group-hover:text-pink-600 transition-colors flex items-center justify-between mt-2">
                             <span class="truncate">{{ order.customerName }}</span>
-                            <a v-if="order.customerPhone" :href="'tel:' + order.customerPhone" title="กดเพื่อโทรออก" class="text-xs text-pink-600 hover:text-pink-700 bg-pink-50 px-2 py-1 rounded-lg border border-pink-100 shrink-0 font-medium">
+                            <span class="flex items-center gap-1.5 shrink-0">
+                                <a v-if="order.customerPhone" :href="'tel:' + order.customerPhone" title="กดเพื่อโทรออก" class="text-xs text-pink-600 hover:text-pink-700 bg-pink-50 px-2 py-1 rounded-lg border border-pink-100 shrink-0 font-medium">
                                 <i class="fa-solid fa-phone text-[10px] mr-1"></i>{{ order.customerPhone }}
                             </a>
+                                <button v-if="order.customerPhone" type="button" @click="openQuickEdit('phone', order)" title="แก้เบอร์โทร" class="md:hidden w-8 h-8 shrink-0 rounded-lg bg-slate-100 active:bg-slate-200 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-pen text-[11px]"></i></button>
+                                <button v-else-if="!isFinishedStatus(order.status)" type="button" @click="openQuickEdit('phone', order)" class="md:hidden text-xs font-medium text-pink-600 px-2.5 py-1.5 rounded-lg border border-dashed border-pink-300 bg-pink-50/40 active:bg-pink-100">＋ เพิ่มเบอร์โทร</button>
+                            </span>
                         </h2>
 
                         <p v-if="order.queueNo" class="text-xs text-slate-400 mt-0.5">คิวที่: {{ order.queueNo }}</p>
@@ -590,19 +657,24 @@
                             <div class="min-w-0">
                                 <div class="text-[11px] text-slate-400 leading-tight">กำหนดส่ง/นัดรับ</div>
                                 <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                    <span class="text-sm font-bold text-slate-800">{{ deliveryLabel(order.deliveryDate) }}</span>
+                                    <span v-if="order.deliveryDate || isFinishedStatus(order.status)" class="text-sm font-bold text-slate-800">{{ deliveryLabel(order.deliveryDate) }}</span>
+                                    <button v-else type="button" @click="openQuickEdit('date', order)" class="text-xs font-medium text-pink-600 px-2.5 py-1.5 rounded-lg border border-dashed border-pink-300 bg-pink-50/40 active:bg-pink-100">＋ ระบุวันส่ง</button>
+                                    <button v-if="order.deliveryDate && !isFinishedStatus(order.status)" type="button" @click="openQuickEdit('date', order)" title="เลื่อน/แก้วันส่ง" class="w-7 h-7 rounded-lg bg-slate-100 active:bg-slate-200 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-pen text-[10px]"></i></button>
                                     <span v-if="urgencyChip(order)" :class="urgencyChip(order).cls" class="px-2 py-0.5 rounded-full text-[11px] font-bold">{{ urgencyChip(order).text }}</span>
                                     <span v-if="order.notes" class="px-1.5 py-0.5 rounded-full text-[11px] text-amber-700 bg-amber-50 border border-amber-100">📌 มีหมายเหตุ</span>
                                 </div>
                             </div>
-                            <div class="text-right shrink-0">
+                            <button type="button" @click="openQuickEdit('payment', order)" title="บันทึกการชำระเงิน" class="text-right shrink-0 -m-1 p-1 rounded-lg active:bg-slate-100">
                                 <template v-if="getRemainingBalance(order) > 0">
                                     <div class="text-[11px] text-slate-400 leading-tight">ค้างชำระ</div>
                                     <div class="text-base font-bold text-rose-600">฿{{ formatNumber(getRemainingBalance(order)) }}</div>
+                                    <div class="text-[10px] text-pink-500 leading-tight">แตะเพื่อบันทึกชำระ</div>
                                 </template>
                                 <div v-else class="text-sm font-bold text-emerald-600">✓ ชำระครบแล้ว</div>
-                            </div>
+                            </button>
                         </div>
+
+                        <button v-if="!isExpanded(order) && order.deliveryType === 'shipping' && !order.location && !isFinishedStatus(order.status)" type="button" @click="openQuickEdit('address', order)" class="md:hidden w-full py-2.5 text-xs font-medium text-pink-600 rounded-lg border border-dashed border-pink-300 bg-pink-50/40 active:bg-pink-100">＋ เพิ่มที่อยู่จัดส่ง</button>
 
                         <!-- MOBILE quick actions (collapsed card): tracking / map -->
                         <a v-if="!isExpanded(order) && order.deliveryType === 'shipping' && order.trackingNumber" :href="trackingUrl(order)" target="_blank" rel="noopener"
@@ -628,7 +700,10 @@
                             <div class="p-2.5 rounded-lg border transition-all"
                                  :class="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' ? 'bg-rose-600 text-white border-rose-700 shadow-sm' : (getDeliveryUrgency(order).type === 'today' && order.status !== 'completed' ? 'bg-amber-400 text-slate-950 border-amber-500 font-bold shadow-sm' : 'bg-amber-50/70 border-amber-200 text-amber-900')">
                                 <span class="block mb-0.5 text-[11px] font-medium" :class="getDeliveryUrgency(order).type === 'overdue' && order.status !== 'completed' ? 'text-rose-100' : 'opacity-80'"><i class="fa-regular fa-calendar-xmark mr-1"></i>กำหนดส่ง/นัดรับ</span>
-                                <span class="font-bold text-sm">{{ deliveryLabel(order.deliveryDate) }}</span>
+                                <span class="flex items-center justify-between gap-2">
+                                    <span class="font-bold text-sm">{{ deliveryLabel(order.deliveryDate) }}</span>
+                                    <button v-if="!isFinishedStatus(order.status)" type="button" @click="openQuickEdit('date', order)" title="ตั้ง/แก้วันส่ง" class="md:hidden w-7 h-7 -my-1 rounded-lg bg-black/10 flex items-center justify-center"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                                </span>
                             </div>
                         </div>
 
@@ -644,6 +719,7 @@
                                 </span>
                             </div>
                             <p class="text-slate-700 leading-relaxed font-medium select-all">{{ order.location || 'ไม่ได้ระบุที่อยู่จัดส่ง' }}</p>
+                            <button type="button" @click="openQuickEdit('address', order)" class="md:hidden w-full py-2 rounded-lg bg-white border border-sky-200 text-sky-700 font-semibold text-xs flex items-center justify-center gap-1.5"><i class="fa-solid fa-pen text-[10px]"></i> {{ order.location ? 'แก้ที่อยู่จัดส่ง' : '＋ เพิ่มที่อยู่จัดส่ง' }}</button>
                             <div class="pt-1 flex flex-col gap-1.5">
                                 <div v-if="order.trackingNumber" class="bg-white p-2 rounded-lg border border-sky-200 space-y-2">
                                     <div class="flex items-center justify-between">
@@ -676,6 +752,7 @@
                                 </span>
                             </div>
                             <p class="text-slate-700 line-clamp-2 mb-2">{{ order.location || 'หน้าร้านค้าหลัก' }}</p>
+                            <button type="button" @click="openQuickEdit('address', order)" class="md:hidden w-full mb-2 py-2 rounded-lg bg-white border border-indigo-200 text-indigo-700 font-semibold text-xs flex items-center justify-center gap-1.5"><i class="fa-solid fa-pen text-[10px]"></i> แก้สถานที่นัดรับ</button>
                             <a v-if="order.lat && order.lng" 
                                :href="`https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`" 
                                target="_blank" 
@@ -702,6 +779,7 @@
                                     ฿{{ formatNumber(getRemainingBalance(order)) }}
                                 </span>
                             </div>
+                            <button type="button" @click="openQuickEdit('payment', order)" class="md:hidden w-full mt-1 py-2.5 rounded-lg bg-white border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5"><i class="fa-solid fa-money-bill-transfer"></i> บันทึกการชำระเงิน</button>
                         </div>
 
                         <button @click="toggleExpand(order)" class="md:hidden w-full py-2 text-xs font-semibold text-slate-500 flex items-center justify-center gap-1.5 border-t border-slate-200/60">
@@ -1767,6 +1845,97 @@
                     if (action === 'print') printSingleWorkOrder(o);
                     else if (action === 'tracking') openTrackingModal(o);
                     else if (action === 'delete') confirmDelete(o);
+                    else if (action === 'addItem') openQuickEdit('addItem', o);
+                }
+
+                // ---------- Quick edit (fill in a single missing detail from the card) ----------
+                const quickEdit = ref(null); // { type, id }
+                const quickForm = ref({ text: '', date: '', amount: '', mode: 'add', details: '', price: '' });
+                const quickInput = ref(null);
+                const quickOrder = computed(() => quickEdit.value ? (orders.value.find(o => o.id === quickEdit.value.id) || null) : null);
+                const quickTitle = computed(() => {
+                    const q = quickEdit.value, o = quickOrder.value;
+                    if (!q || !o) return '';
+                    return ({ phone: 'เบอร์โทรศัพท์', date: 'กำหนดส่ง / นัดรับ', payment: 'บันทึกการชำระเงิน', addItem: 'เพิ่มสินค้า' })[q.type]
+                        || (o.deliveryType === 'shipping' ? 'ที่อยู่จัดส่งพัสดุ' : 'สถานที่นัดรับ');
+                });
+                const quickPay = computed(() => {
+                    const o = quickOrder.value;
+                    const total = o ? (Number(o.totalAmount) || 0) : 0;
+                    const cur = o ? (Number(o.depositAmount) || 0) : 0;
+                    const raw = quickForm.value.amount;
+                    const n = Number(raw);
+                    const hasAmount = raw !== '' && raw !== null && !isNaN(n);
+                    const next = quickForm.value.mode === 'add' ? cur + (hasAmount ? n : 0) : (hasAmount ? n : cur);
+                    return { total, cur, curRemaining: Math.max(0, total - cur), next, remaining: Math.max(0, total - next), hasAmount, valid: hasAmount && next >= 0 };
+                });
+                function quickItemsTotalOf(o) {
+                    const ship = o.deliveryType === 'shipping' ? (Number(o.shippingFee) || 0) : 0;
+                    return (o.items || []).reduce((sum, i) => sum + (Number(i.qty) || 0) * (Number(i.price) || 0), 0) + ship;
+                }
+                const quickNewTotal = computed(() => {
+                    const o = quickOrder.value;
+                    if (!o) return 0;
+                    const add = Number(quickForm.value.price) || 0;
+                    if (o.items && o.items.length) return quickItemsTotalOf({ ...o, items: [...o.items, { qty: 1, price: add }] });
+                    return (Number(o.totalAmount) || 0) + add;
+                });
+                function openQuickEdit(type, order) {
+                    quickEdit.value = { type, id: order.id };
+                    quickForm.value = {
+                        text: type === 'phone' ? (order.customerPhone || '') : (type === 'address' ? (order.location || '') : ''),
+                        date: order.deliveryDate || '', amount: '', mode: 'add', details: '', price: ''
+                    };
+                    setTimeout(() => { if (quickInput.value && quickInput.value.focus) quickInput.value.focus(); }, 120);
+                }
+                function closeQuickEdit() { quickEdit.value = null; }
+                watch(quickEdit, (v) => { document.body.style.overflow = v ? 'hidden' : ''; });
+                function quickPayFull() {
+                    quickForm.value.mode = 'add';
+                    quickForm.value.amount = String(quickPay.value.curRemaining);
+                }
+                function saveQuickEdit() {
+                    const q = quickEdit.value, o = quickOrder.value;
+                    if (!q || !o) return;
+                    const inc = (n) => firebase.firestore.FieldValue.increment(n);
+                    let patch = null, msg = 'บันทึกเรียบร้อย';
+                    if (q.type === 'phone') { patch = { customerPhone: (quickForm.value.text || '').trim() }; msg = 'บันทึกเบอร์โทรแล้ว'; }
+                    else if (q.type === 'address') { patch = { location: (quickForm.value.text || '').trim() }; msg = o.deliveryType === 'shipping' ? 'บันทึกที่อยู่จัดส่งแล้ว' : 'บันทึกสถานที่นัดรับแล้ว'; }
+                    else if (q.type === 'date') { patch = { deliveryDate: quickForm.value.date || '' }; msg = quickForm.value.date ? 'บันทึกวันส่งแล้ว' : 'ล้างวันส่งแล้ว'; }
+                    else if (q.type === 'payment') {
+                        const p = quickPay.value;
+                        if (!p.hasAmount) { showToast('กรุณากรอกจำนวนเงิน'); return; }
+                        if (!p.valid) { showToast('ยอดที่ชำระแล้วติดลบไม่ได้'); return; }
+                        // "add" uses an atomic increment so a payment entered on another device at the same time is not lost
+                        patch = { depositAmount: quickForm.value.mode === 'add' ? inc(Number(quickForm.value.amount)) : Number(quickForm.value.amount) };
+                        msg = 'บันทึกการชำระเงินแล้ว';
+                    }
+                    else if (q.type === 'addItem') {
+                        const details = (quickForm.value.details || '').trim();
+                        if (!details) { showToast('กรุณากรอกรายการสินค้าที่เพิ่ม'); return; }
+                        const price = Number(quickForm.value.price) || 0;
+                        if (o.items && o.items.length) {
+                            // itemized order: append a row, then rebuild the product text + total exactly like the full form does
+                            const items = [...o.items.map(i => ({ ...i })), { id: Date.now() + Math.random(), details, qty: 1, unit: 'ช่อ', price }];
+                            const products = items.map(item => {
+                                const label = (item.details || '').trim();
+                                if (!label) return null;
+                                const qty = Number(item.qty) || 0;
+                                return qty > 1 ? `${label} (x${qty} ${item.unit || ''})`.trim() : label;
+                            }).filter(Boolean).join('\n');
+                            patch = { items, products, totalAmount: quickItemsTotalOf({ ...o, items }) };
+                        } else {
+                            const base = (o.products || '').replace(/\s+$/, '');
+                            patch = { products: base ? base + '\n' + details : details };
+                            if (price) patch.totalAmount = inc(price);
+                        }
+                        msg = 'เพิ่มสินค้าเรียบร้อย';
+                    }
+                    if (!patch) return;
+                    db.collection('orders').doc(o.id).update(patch)
+                        .then(() => showToast(msg))
+                        .catch(() => showToast('บันทึกไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                    closeQuickEdit();
                 }
                 function urgencyChip(order) {
                     const u = getDeliveryUrgency(order);
@@ -3142,7 +3311,8 @@
                 return {
                     orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
                     isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
-                    isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip, deliveryLabel,
+                    isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip, deliveryLabel, isFinishedStatus,
+                    quickEdit, quickForm, quickInput, quickOrder, quickTitle, quickPay, quickNewTotal, openQuickEdit, closeQuickEdit, saveQuickEdit, quickPayFull,
                     isModalOpen, showMoreFields, formStep, formStepTitles, formScroll, nextStep, prevStep, onFormSubmit, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
                     filteredOrders, activeOrdersCount, statusCounts, completedCount, cancelledCount, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
