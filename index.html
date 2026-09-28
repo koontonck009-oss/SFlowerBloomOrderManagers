@@ -47,6 +47,7 @@
         /* clip (not hidden) so body does not become a scroll container — that would break position:sticky */
         body { overflow-x: clip; max-width: 100vw; }
         @media (max-width: 639px) {
+            .order-form .step-sec:not(.step-on) { display: none; }
             .order-form input:not([type=radio]):not([type=checkbox]):not([type=file]), .order-form select, .order-form textarea { font-size: 16px !important; }
         }
         .hide-scrollbar { scrollbar-width: none; }
@@ -1074,8 +1075,20 @@
                     </button>
                 </div>
 
-                <form @submit.prevent="saveOrder" class="order-form flex flex-col flex-1 min-h-0">
-                    <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                <form @submit.prevent="onFormSubmit" class="order-form flex flex-col flex-1 min-h-0">
+                    <!-- Step indicator (mobile only) -->
+                    <div class="sm:hidden shrink-0 px-4 pt-3 pb-2 bg-white border-b border-slate-100">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-xs font-bold text-slate-800">ขั้นที่ {{ formStep }}/3 · {{ formStepTitles[formStep - 1] }}</span>
+                            <span class="text-[11px] text-slate-400">{{ formStep < 3 ? 'ถัดไป: ' + formStepTitles[formStep] : 'ขั้นสุดท้าย' }}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <div v-for="n in 3" :key="n" class="h-1.5 rounded-full transition-colors" :class="n <= formStep ? 'bg-pink-500' : 'bg-slate-200'"></div>
+                        </div>
+                    </div>
+                    <div ref="formScroll" class="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4">
+                    <!-- STEP 1 -->
+                    <div class="step-sec space-y-4" :class="{ 'step-on': formStep === 1 }">
                     <!-- Delivery Mode Selection -->
                     <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
                         <label class="py-3 sm:py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all flex items-center justify-center gap-2"
@@ -1138,6 +1151,9 @@
                         </div>
                     </div>
 
+                    </div>
+                    <!-- STEP 2 -->
+                    <div class="step-sec space-y-4" :class="{ 'step-on': formStep === 2 }">
                     <!-- Dates -->
                     <div class="grid grid-cols-2 gap-3 sm:gap-4">
                         <div>
@@ -1196,6 +1212,9 @@
                         </div>
                     </div>
 
+                    </div>
+                    <!-- STEP 3 -->
+                    <div class="step-sec space-y-4" :class="{ 'step-on': formStep === 3 }">
                     <!-- Financial Details -->
                     <div class="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
                         <span class="text-xs font-bold text-slate-700 block">💰 รายละเอียดการชำระเงิน</span>
@@ -1317,6 +1336,7 @@
                         </div>
                     </div>
                     </div>
+                    </div>
 
                     <!-- Sticky footer: always visible on mobile -->
                     <div class="shrink-0 px-4 sm:px-6 pt-3 bg-white border-t border-slate-100 flex items-center gap-2 sm:gap-3" style="padding-bottom: max(12px, env(safe-area-inset-bottom));">
@@ -1324,10 +1344,16 @@
                             <div class="text-[10px] text-slate-400">ยอดรวม</div>
                             <div class="text-sm sm:text-base font-black text-slate-900 truncate">฿{{ formatNumber(formItemizedMode ? formItemsGrandTotal : form.totalAmount) }}</div>
                         </div>
-                        <button type="button" @click="closeModal" class="px-4 py-3 sm:py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium rounded-xl text-sm">
+                        <button type="button" @click="closeModal" :class="formStep > 1 ? 'hidden sm:block' : ''" class="px-4 py-3 sm:py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium rounded-xl text-sm">
                             ยกเลิก
                         </button>
-                        <button type="submit" class="px-5 sm:px-6 py-3 sm:py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2">
+                        <button v-if="formStep > 1" type="button" @click="prevStep" class="sm:hidden px-4 py-3 border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium rounded-xl text-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-chevron-left text-xs"></i> ย้อนกลับ
+                        </button>
+                        <button v-if="formStep < 3" type="button" @click="nextStep" class="sm:hidden px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl text-sm shadow-sm flex items-center justify-center gap-2">
+                            <span>ถัดไป</span> <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                        <button type="submit" :class="formStep < 3 ? 'hidden sm:flex' : 'flex'" class="px-5 sm:px-6 py-3 sm:py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl text-sm shadow-sm items-center justify-center gap-2">
                             <i class="fa-solid fa-floppy-disk"></i>
                             <span>บันทึก</span>
                         </button>
@@ -1756,6 +1782,32 @@
                 
                 const isModalOpen = ref(false);
                 const showMoreFields = ref(false);
+                const formStep = ref(1);
+                const formStepTitles = ['ข้อมูลลูกค้า & สินค้า', 'วันที่ & การจัดส่ง', 'การชำระเงิน'];
+                const formScroll = ref(null);
+                const isMobileForm = () => window.matchMedia('(max-width: 639px)').matches;
+                function goToStep(n) {
+                    formStep.value = n;
+                    nextTick(() => {
+                        if (formScroll.value) formScroll.value.scrollTop = 0;
+                        if (n === 2 && form.value.deliveryType === 'pickup') initOrderMap(form.value.lat, form.value.lng);
+                    });
+                }
+                function nextStep() {
+                    // validate only the fields on the current step (other steps are hidden on mobile)
+                    const sec = document.querySelector('form.order-form .step-sec.step-on');
+                    if (sec) {
+                        const bad = Array.from(sec.querySelectorAll('input[required], textarea[required], select[required]')).find(el => !el.checkValidity());
+                        if (bad) { bad.reportValidity(); return; }
+                    }
+                    if (formStep.value < 3) goToStep(formStep.value + 1);
+                }
+                function prevStep() { if (formStep.value > 1) goToStep(formStep.value - 1); }
+                function onFormSubmit() {
+                    // On mobile, pressing Enter / submit before the last step just moves to the next step
+                    if (isMobileForm() && formStep.value < 3) { nextStep(); return; }
+                    saveOrder();
+                }
                 const isStoreModalOpen = ref(false);
                 const isEditing = ref(false);
                 const editingId = ref(null);
@@ -2507,8 +2559,9 @@
                             status: 'pending'
                         };
                     }
+                    formStep.value = 1;
                     isModalOpen.value = true;
-                    if (form.value.deliveryType === 'pickup') initOrderMap(form.value.lat, form.value.lng);
+                    if (form.value.deliveryType === 'pickup' && !isMobileForm()) initOrderMap(form.value.lat, form.value.lng);
                 }
 
                 function closeModal() {
@@ -3090,7 +3143,7 @@
                     orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
                     isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
                     isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip, deliveryLabel,
-                    isModalOpen, showMoreFields, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
+                    isModalOpen, showMoreFields, formStep, formStepTitles, formScroll, nextStep, prevStep, onFormSubmit, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
                     filteredOrders, activeOrdersCount, statusCounts, completedCount, cancelledCount, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
