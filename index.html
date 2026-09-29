@@ -931,6 +931,12 @@
             </table>
         </div>
 
+        <div v-else-if="!ordersLoaded" class="bg-white rounded-2xl border border-slate-200 p-12 text-center my-8 no-print">
+            <i class="fa-solid fa-spinner fa-spin text-3xl text-pink-500"></i>
+            <h3 class="text-base font-bold text-slate-800 mt-4">กำลังโหลดออเดอร์...</h3>
+            <p class="text-slate-500 text-xs mt-1">ครั้งแรกอาจใช้เวลาสักครู่ เปิดครั้งถัดไปจะเร็วขึ้น</p>
+        </div>
+
         <div v-else-if="filteredOrders.length === 0" class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center my-8 no-print">
             <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i class="fa-solid fa-inbox text-2xl"></i>
@@ -1817,6 +1823,15 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        // แคชข้อมูลไว้ในเครื่อง: เปิดครั้งถัดไปแสดงออเดอร์ทันทีจากเครื่อง แล้วดึงเฉพาะส่วนที่เปลี่ยนจากเซิร์ฟเวอร์
+        // (ต้องเรียกก่อนใช้ Firestore อย่างอื่น) ถ้าเบราว์เซอร์ไม่รองรับ จะทำงานแบบเดิมโดยไม่แคช
+        try {
+            db.settings({ cacheSizeBytes: 200 * 1024 * 1024 });
+            db.enablePersistence({ synchronizeTabs: true })
+                .catch((err) => console.warn('Firestore offline cache unavailable:', err && err.code));
+        } catch (err) {
+            console.warn('Firestore offline cache setup failed:', err);
+        }
         const auth = firebase.auth();
 
         // Login screen accepts a plain "admin" id, but the real password check happens
@@ -3058,6 +3073,7 @@
                 }
 
                 let isFirstOrdersLoad = true;
+                const ordersLoaded = ref(false);
                 // ===== บัญชีรายรับ-รายจ่าย =====
                 const ACC_INCOME_CATEGORIES = ['ขายหน้าร้าน', 'รายรับอื่นๆ'];
                 const ACC_EXPENSE_CATEGORIES = ['วัสดุ/ดอกไม้', 'บรรจุภัณฑ์', 'ค่าจัดส่ง', 'ค่าโฆษณา', 'ค่าเดินทาง/น้ำมัน', 'ค่าธรรมเนียม', 'อื่นๆ'];
@@ -3237,14 +3253,18 @@
 
                     // ออเดอร์ทั้งหมด ซิงค์แบบเรียลไทม์ระหว่างทุกเครื่องที่เปิดหน้านี้
                     db.collection('orders').onSnapshot((snapshot) => {
-                        if (snapshot.empty && isFirstOrdersLoad) {
+                        // snapshot ที่มาจากแคชในเครื่อง (ยังไม่ได้คุยกับเซิร์ฟเวอร์) อาจว่างเปล่าได้ ห้ามเอาไปตัดสินว่าฐานข้อมูลว่าง
+                        const fromCache = !!(snapshot.metadata && snapshot.metadata.fromCache);
+                        if (snapshot.empty && isFirstOrdersLoad && !fromCache) {
                             // ฐานข้อมูลว่างในครั้งแรก ใส่ข้อมูลตัวอย่างเริ่มต้นให้
                             initialOrders.forEach(o => db.collection('orders').doc(o.id).set(o));
                         } else {
                             orders.value = snapshot.docs.map(d => d.data());
                         }
-                        isFirstOrdersLoad = false;
+                        if (!fromCache) isFirstOrdersLoad = false;
+                        if (!fromCache || !snapshot.empty) ordersLoaded.value = true;
                     }, (err) => {
+                        ordersLoaded.value = true;
                         console.error('Firestore (orders) error:', err);
                         showToast('เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจสอบ Firebase config');
                     });
@@ -3313,7 +3333,7 @@
                 });
 
                 return {
-                    orders, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
+                    orders, ordersLoaded, searchQuery, filterType, statusFilter, datePreset, sortBy, currentView,
                     isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
                     isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip, deliveryLabel, isFinishedStatus,
                     quickEdit, quickForm, quickInput, quickOrder, quickTitle, quickPay, quickNewTotal, openQuickEdit, closeQuickEdit, saveQuickEdit, quickPayFull,
