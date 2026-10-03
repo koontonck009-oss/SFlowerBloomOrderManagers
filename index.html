@@ -149,6 +149,7 @@
                 margin: 5mm;
             }
         }
+        .flash-highlight { outline: 3px solid #ec4899; outline-offset: 2px; border-radius: 1rem; }
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-12">
@@ -505,10 +506,11 @@
                     <span class="text-[11px] sm:text-xs font-medium text-amber-700 block">รอส่งพัสดุ / นัดรับ</span>
                     <span class="text-lg sm:text-xl font-bold text-amber-800">{{ pendingCount }} <span class="text-xs font-normal text-amber-600">รายการ</span></span>
                 </div>
-                <div class="bg-rose-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-rose-100/80">
+                <button type="button" @click="unpaidOnly = !unpaidOnly" title="แตะเพื่อดูเฉพาะออเดอร์ที่ค้างชำระ" class="text-left bg-rose-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 transition-all" :class="unpaidOnly ? 'border-rose-400 ring-2 ring-rose-300 bg-rose-50' : 'border-rose-100/80 hover:border-rose-300'">
                     <span class="text-[11px] sm:text-xs font-medium text-rose-700 block">ยอดค้างชำระรวม</span>
                     <span class="text-lg sm:text-xl font-bold text-rose-800">฿{{ formatNumber(totalRemainingSum) }}</span>
-                </div>
+                    <span class="block text-[10px] leading-tight mt-0.5" :class="unpaidOnly ? 'text-rose-700 font-bold' : 'text-rose-400'">{{ unpaidOnly ? '● กำลังกรอง แตะเพื่อยกเลิก' : 'แตะเพื่อดูออเดอร์ที่ค้าง' }}</span>
+                </button>
             </div>
         </header>
 
@@ -654,8 +656,34 @@
             </div>
         </div>
 
+        <!-- Today's queue -->
+        <div v-if="todayQueue.length || overdueCount" class="mb-4 bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden no-print">
+            <div class="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-amber-50/70">
+                <button type="button" @click="queueOpen = !queueOpen" class="flex items-center gap-2 min-w-0 text-left">
+                    <span class="text-sm font-bold text-amber-900">⚡ คิววันนี้</span>
+                    <span class="px-2 py-0.5 rounded-full bg-amber-400 text-slate-900 text-[11px] font-bold">{{ todayQueue.length }}</span>
+                    <i class="fa-solid text-[10px] text-amber-700" :class="queueOpen ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </button>
+                <button v-if="overdueCount" type="button" @click="statusFilter = 'active'; datePreset = 'overdue'" class="px-2.5 py-1 rounded-full bg-rose-600 text-white text-[11px] font-bold whitespace-nowrap">🚨 เลยกำหนด {{ overdueCount }} ›</button>
+            </div>
+            <ul v-show="queueOpen" class="divide-y divide-slate-100">
+                <li v-if="!todayQueue.length" class="px-4 py-3 text-xs text-slate-400">วันนี้ไม่มีงานที่ต้องส่ง/นัดรับ</li>
+                <li v-for="o in todayQueue" :key="o.id">
+                    <button type="button" @click="jumpToOrder(o)" class="w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100">
+                        <span class="w-14 shrink-0 text-sm font-bold" :class="o.deliveryTime ? 'text-indigo-700' : 'text-slate-300'">{{ o.deliveryTime || '—' }}</span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-sm font-semibold text-slate-800 truncate">{{ o.customerName }}</span>
+                            <span class="block text-[11px] text-slate-500 truncate">{{ o.deliveryType === 'shipping' ? '📦 พัสดุ' : '🏪 นัดรับ' }} · {{ String(o.products || '').split('\n')[0] }}</span>
+                        </span>
+                        <span v-if="getRemainingBalance(o) > 0" class="shrink-0 text-xs font-bold text-rose-600">ค้าง ฿{{ formatNumber(getRemainingBalance(o)) }}</span>
+                        <span class="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full border" :class="getStatusClass(o.status)">{{ statusLabelOf(o.status) }}</span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+
         <div v-if="currentView === 'grid' && filteredOrders.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 no-print">
-            <div v-for="(order, index) in filteredOrders" :key="order.id" 
+            <div v-for="(order, index) in filteredOrders" :key="order.id" :id="'order-row-' + order.id" 
                  class="rounded-2xl border shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group relative"
                  :class="getDeliveryUrgency(order).cardClass">
                 
@@ -693,6 +721,8 @@
                                 <span v-else class="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1.5 rounded-full md:bg-transparent md:border-0 md:p-0">
                                     <i class="fa-solid fa-store"></i> นัดรับ
                                 </span>
+                                <!-- Payment status badge -->
+                                <button v-if="paymentBadge(order)" type="button" @click="openQuickEdit('payment', order)" :title="'บันทึกการชำระเงิน'" class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full border" :class="paymentBadge(order).cls">{{ paymentBadge(order).text }}</button>
                             </div>
                             <select :value="order.status" @change="handleStatusChange(order, $event)" class="text-xs font-bold px-2 py-2 rounded-lg border focus:outline-none cursor-pointer transition-colors shadow-sm shrink-0" :class="getStatusClass(order.status)">
                                 <option value="pending">🟡 รอดำเนินการ</option>
@@ -922,7 +952,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    <tr v-for="order in filteredOrders" :key="order.id" class="hover:bg-slate-50/80 transition-colors">
+                    <tr v-for="order in filteredOrders" :key="order.id" :id="'order-row-' + order.id" class="hover:bg-slate-50/80 transition-colors">
                         <td class="p-3 text-center">
                             <input type="checkbox" :value="order.id" v-model="selectedForPrint" class="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 cursor-pointer">
                         </td>
@@ -963,6 +993,7 @@
                         <td class="hidden lg:table-cell p-3 md:p-4 text-right text-emerald-600">฿{{ formatNumber(order.depositAmount) }}</td>
                         <td class="p-3 md:p-4 text-right font-bold" :class="order.status === 'cancelled' ? 'text-slate-400' : (getRemainingBalance(order) > 0 ? 'text-rose-600' : 'text-emerald-600')">
                             {{ order.status === 'cancelled' ? 'ยกเลิกแล้ว' : '฿' + formatNumber(getRemainingBalance(order)) }}
+                            <div v-if="paymentBadge(order)" class="mt-0.5"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full border" :class="paymentBadge(order).cls">{{ paymentBadge(order).text }}</span></div>
                         </td>
                         <td class="p-3 md:p-4 text-center">
                             <select :value="order.status" @change="handleStatusChange(order, $event)" class="text-xs font-bold px-2 py-1.5 rounded-lg border cursor-pointer" :class="getStatusClass(order.status)">
@@ -1858,9 +1889,10 @@
             </div>
         </div>
 
-        <div v-if="toastMessage" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center justify-center sm:justify-start gap-3 transition-all animate-bounce no-print">
+        <div v-if="toastMessage" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-[80] bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 flex items-center justify-center sm:justify-start gap-3 transition-all no-print" :class="toastUndo ? '' : 'animate-bounce'">
             <i class="fa-solid fa-circle-check text-pink-400"></i>
             <span class="text-sm font-medium">{{ toastMessage }}</span>
+            <button v-if="toastUndo" type="button" @click="runToastUndo" class="ml-1 px-3 py-1 rounded-lg bg-pink-500 hover:bg-pink-400 text-white text-xs font-bold">เลิกทำ</button>
         </div>
 
         <!-- Delete Modal -->
@@ -1921,6 +1953,7 @@
                 const searchQuery = ref('');
                 const filterType = ref('all');
                 const statusFilter = ref('active'); // default: hide completed/cancelled orders
+                const unpaidOnly = ref(false); // show only orders with an outstanding balance (any status except cancelled)
                 const datePreset = ref('all');
                 const sortBy = ref('delivery_asc');
                 const currentView = ref('grid');
@@ -2074,6 +2107,8 @@
                 const isEditing = ref(false);
                 const editingId = ref(null);
                 const toastMessage = ref('');
+                const toastUndo = ref(null);
+                let toastTimer = null;
                 const deleteTarget = ref(null);
                 const receiptTarget = ref(null);
                 const galleryTarget = ref(null);
@@ -2274,8 +2309,35 @@
                     { k: 'all', t: 'รวมที่ยกเลิก', count: orders.value.length, dot: '' }
                 ]);
                 const typeTabs = [{ k: 'all', t: 'ทุกประเภท' }, { k: 'shipping', t: 'จัดส่งพัสดุ' }, { k: 'pickup', t: 'นัดรับหน้าร้าน' }];
-                const hasActiveFilters = computed(() => filterType.value !== 'all' || datePreset.value !== 'all' || statusFilter.value !== 'active' || searchQuery.value.trim() !== '');
-                function clearAllFilters() { filterType.value = 'all'; datePreset.value = 'all'; statusFilter.value = 'active'; searchQuery.value = ''; }
+                const hasActiveFilters = computed(() => filterType.value !== 'all' || datePreset.value !== 'all' || statusFilter.value !== 'active' || searchQuery.value.trim() !== '' || unpaidOnly.value);
+                function clearAllFilters() { filterType.value = 'all'; datePreset.value = 'all'; statusFilter.value = 'active'; searchQuery.value = ''; unpaidOnly.value = false; }
+                function paymentBadge(o) {
+                    if (!o || o.status === 'cancelled') return null;
+                    const total = Number(o.totalAmount) || 0, paid = Number(o.depositAmount) || 0;
+                    if (total <= 0) return null;
+                    if (paid >= total) return { text: 'ชำระครบ', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                    if (paid > 0) return { text: 'มัดจำแล้ว', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+                    return { text: 'ยังไม่ชำระ', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
+                }
+                function statusLabelOf(st) { return ({ pending: 'รอดำเนินการ', in_progress: 'กำลังทำ', ready: 'พร้อมส่ง/รับ', completed: 'ส่งสำเร็จ', cancelled: 'ยกเลิก' })[st] || st; }
+                const queueOpen = ref(true);
+                const todayQueue = computed(() => {
+                    const t = getTodayString(0);
+                    return orders.value
+                        .filter(o => !isFinishedStatus(o.status) && o.deliveryDate === t)
+                        .sort((a, b) => (a.deliveryTime || '99:99').localeCompare(b.deliveryTime || '99:99') || String(a.queueNo || '').localeCompare(String(b.queueNo || '')));
+                });
+                const overdueCount = computed(() => orders.value.filter(o => !isFinishedStatus(o.status) && getDeliveryUrgency(o).type === 'overdue').length);
+                function jumpToOrder(o) {
+                    if (!filteredOrders.value.some(x => x.id === o.id)) clearAllFilters();
+                    nextTick(() => {
+                        const el = document.getElementById('order-row-' + o.id);
+                        if (!el) return;
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('flash-highlight');
+                        setTimeout(() => el.classList.remove('flash-highlight'), 1800);
+                    });
+                }
                 const isMoreMenuOpen = ref(false);
                 const cardMoreId = ref(null); // which order card's "⋯" menu is open (desktop)
                 document.addEventListener('click', () => { isMoreMenuOpen.value = false; cardMoreId.value = null; });
@@ -2364,11 +2426,12 @@
                         // 'active' = everything not completed/cancelled. While searching, look across every status
                         // so an older (hidden) order can still be found by name/phone/tracking number.
                         let matchesStatus = statusFilter.value === 'all'
+                            || (statusFilter.value === 'active' && unpaidOnly.value && getRemainingBalance(order) > 0) // unpaid view also lists completed-but-unpaid orders
                             || (statusFilter.value === 'active'
                                 ? (q !== '' || !isFinishedStatus(order.status))
                                 : order.status === statusFilter.value);
                         let matchesDate = datePreset.value === 'all' || (datePreset.value === 'today' && order.deliveryDate === todayStr) || (datePreset.value === 'tomorrow' && order.deliveryDate === tomorrowStr) || (datePreset.value === 'overdue' && getDeliveryUrgency(order).type === 'overdue');
-                        return matchesSearch && matchesFilter && matchesStatus && matchesDate;
+                        return matchesSearch && matchesFilter && matchesStatus && matchesDate && (!unpaidOnly.value || getRemainingBalance(order) > 0);
                     }).sort((a, b) => {
                         // Finished orders (completed/cancelled) always sink to the bottom, regardless of
                         // sort mode, so the active work stays uncluttered at the top of the list.
@@ -2443,6 +2506,7 @@
                     applyStatusChange(order, 'completed', choice === 'paid' ? { depositAmount: u.total } : null);
                 }
                 function applyStatusChange(order, newStatus, extra) {
+                    const prev = { status: order.status, completedAt: order.completedAt || '', depositAmount: order.depositAmount };
                     order.status = newStatus;
                     const statusUpdate = { status: newStatus };
                     if (extra) { Object.assign(statusUpdate, extra); Object.assign(order, extra); }
@@ -2452,19 +2516,35 @@
                         statusUpdate.completedAt = '';
                     }
                     order.completedAt = statusUpdate.completedAt !== undefined ? statusUpdate.completedAt : order.completedAt;
+                    let doneMsg = 'อัปเดตสถานะเรียบร้อย';
                     if (statusFilter.value === 'active' && isFinishedStatus(newStatus)) {
                         // The card is about to leave this view — drop it from the print selection and tell the user where it went
                         selectedForPrint.value = selectedForPrint.value.filter(id => id !== order.id);
-                        showToast(newStatus === 'completed' ? 'ย้ายไปที่ "ส่งสำเร็จ" แล้ว' : 'ย้ายไปที่ "ยกเลิก" แล้ว');
+                        doneMsg = newStatus === 'completed' ? 'ย้ายไปที่ "ส่งสำเร็จ" แล้ว' : 'ย้ายไปที่ "ยกเลิก" แล้ว';
                     }
                     db.collection('orders').doc(order.id).update(statusUpdate)
                         .catch(() => showToast('อัปเดตสถานะไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
-                    showToast('อัปเดตสถานะเรียบร้อย');
+                    showToast(doneMsg, () => {
+                        const back = { status: prev.status, completedAt: prev.completedAt };
+                        if (extra && 'depositAmount' in extra) back.depositAmount = Number(prev.depositAmount) || 0;
+                        Object.assign(order, back);
+                        db.collection('orders').doc(order.id).update(back)
+                            .catch(() => showToast('ย้อนกลับไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                        showToast('ย้อนกลับแล้ว');
+                    });
                 }
 
-                function showToast(msg) {
+                function showToast(msg, undoFn) {
+                    clearTimeout(toastTimer);
                     toastMessage.value = msg;
-                    setTimeout(() => { toastMessage.value = ''; }, 3000);
+                    toastUndo.value = undoFn || null;
+                    toastTimer = setTimeout(() => { toastMessage.value = ''; toastUndo.value = null; }, undoFn ? 6000 : 3000);
+                }
+                function runToastUndo() {
+                    const fn = toastUndo.value;
+                    clearTimeout(toastTimer);
+                    toastMessage.value = ''; toastUndo.value = null;
+                    if (fn) fn();
                 }
 
                 // Work Order Print Functions
@@ -3509,7 +3589,7 @@
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
                     openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
                     getRemainingBalance, getDeliveryUrgency, getDistance, formatNumber, formatDate, getStatusClass,
-                    getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange, unpaidConfirm, resolveUnpaid,
+                    getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange, unpaidConfirm, resolveUnpaid, unpaidOnly, paymentBadge, statusLabelOf, queueOpen, todayQueue, overdueCount, jumpToOrder, toastUndo, runToastUndo,
                     printSingleWorkOrder, openBatchPrintModal, openReceiptModal, triggerPrintReceipt,
                     copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
                     handleFormImageUpload, rotateFormImage, removeFormImage, isCompressingImage,
