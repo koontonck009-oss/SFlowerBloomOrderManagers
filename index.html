@@ -50,6 +50,26 @@
             .order-form .step-sec:not(.step-on) { display: none; }
             .order-form input:not([type=radio]):not([type=checkbox]):not([type=file]), .order-form select, .order-form textarea { font-size: 16px !important; }
         }
+        /* Order form layout: single column on mobile/tablet, two columns on desktop */
+        .of-cols, .of-col { display: contents; }
+        .item-head { display: none; }
+        .item-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; align-items: center; }
+        .item-row .item-details { grid-column: 1 / -1; padding-right: 2rem !important; }
+        .item-row .item-total { grid-column: 1 / -1; text-align: right; }
+        .item-row .item-remove { position: absolute; top: .25rem; right: .25rem; }
+        @media (min-width: 640px) {
+            .item-head, .item-row { grid-template-columns: minmax(0, 1fr) 64px 76px 100px 84px 24px; }
+            .item-head { display: grid; gap: .5rem; }
+            .item-row .item-details { grid-column: auto; padding-right: .875rem !important; }
+            .item-row .item-total { grid-column: auto; }
+            .item-row .item-remove { position: static; }
+        }
+        @media (min-width: 1024px) {
+            .of-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+            .of-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+            .of-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1rem; }
+            #order-map { height: 160px; }
+        }
         .hide-scrollbar { scrollbar-width: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         body {
@@ -1294,7 +1314,7 @@
         </div>
 
         <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm no-print">
-            <div class="bg-white sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-100 w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-hidden sm:my-8 flex flex-col transform transition-all">
+            <div class="bg-white sm:rounded-2xl shadow-xl border-0 sm:border sm:border-slate-100 w-full h-full sm:h-auto sm:max-w-3xl lg:max-w-6xl sm:max-h-[90vh] lg:max-h-[94vh] overflow-hidden sm:my-8 flex flex-col transform transition-all">
                 <div class="px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
                     <h3 class="font-bold text-base sm:text-lg flex items-center gap-2">
                         <i class="fa-solid text-pink-400" :class="isEditing ? 'fa-pen-to-square' : 'fa-circle-plus'"></i>
@@ -1305,7 +1325,7 @@
                     </button>
                 </div>
 
-                <form @submit.prevent="onFormSubmit" class="order-form flex flex-col flex-1 min-h-0">
+                <form @submit.prevent="onFormSubmit" @keydown="onFormKeydown" novalidate class="order-form flex flex-col flex-1 min-h-0">
                     <!-- Step indicator (mobile only) -->
                     <div class="sm:hidden shrink-0 px-4 pt-3 pb-2 bg-white border-b border-slate-100">
                         <div class="flex items-center justify-between mb-1.5">
@@ -1316,10 +1336,9 @@
                             <div v-for="n in 3" :key="n" class="h-1.5 rounded-full transition-colors" :class="n <= formStep ? 'bg-pink-500' : 'bg-slate-200'"></div>
                         </div>
                     </div>
-                    <div ref="formScroll" class="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4">
-                    <!-- STEP 1 -->
-                    <div class="step-sec space-y-4" :class="{ 'step-on': formStep === 1 }">
-                    <!-- Delivery Mode Selection -->
+<div ref="formScroll" class="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4">
+                    <!-- Delivery type -->
+                    <div class="step-sec" :class="{ 'step-on': formStep === 1 }">
                     <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
                         <label class="py-3 sm:py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all flex items-center justify-center gap-2"
                                :class="form.deliveryType === 'shipping' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'">
@@ -1332,199 +1351,61 @@
                             <span>🏪 นัดรับหน้าร้าน</span>
                         </label>
                     </div>
-
-                    <!-- Customer -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อลูกค้า <span class="text-rose-500">*</span></label>
-                            <input v-model="form.customerName" required type="text" autocomplete="off" placeholder="เช่น คุณสมชาย ใจดี" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">เบอร์โทรศัพท์ <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
-                            <input v-model="form.customerPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="เช่น 081-234-5678" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                        </div>
                     </div>
 
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="block text-xs font-semibold text-slate-700">รายละเอียดสินค้า (สำหรับพิมพ์ใบสั่งงาน) <span class="text-rose-500">*</span></label>
-                            <button type="button" @click="toggleFormItemizedMode" class="text-[11px] px-2 py-1 rounded-lg font-medium border transition-colors"
-                                    :class="formItemizedMode ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'">
-                                <i class="fa-solid" :class="formItemizedMode ? 'fa-check' : 'fa-list-ul'"></i>
-                                แยกราคารายชิ้น
-                            </button>
+                    <div class="of-cols">
+                    <!-- LEFT: what to make -->
+                    <div class="of-col">
+                    <!-- 1 Customer -->
+                    <section class="step-sec of-card space-y-3" :class="{ 'step-on': formStep === 1 }">
+                        <h4 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="hidden lg:inline-flex w-5 h-5 rounded-full bg-slate-800 text-white text-[11px] items-center justify-center shrink-0">1</span><span>ลูกค้า</span></h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="f-customerName" class="block text-xs font-semibold text-slate-700 mb-1">ชื่อลูกค้า <span class="text-rose-500">*</span></label>
+                                <input id="f-customerName" v-model="form.customerName" @input="formErrors.customerName = ''" type="text" autocomplete="off" placeholder="เช่น คุณสมชาย ใจดี" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500" :class="formErrors.customerName ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200'">
+                                <p v-if="formErrors.customerName" class="text-[11px] text-rose-600 mt-1">{{ formErrors.customerName }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">เบอร์โทรศัพท์</label>
+                                <input v-model="form.customerPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="เช่น 081-234-5678" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200">
+                            </div>
                         </div>
+                    </section>
 
-                        <textarea v-if="!formItemizedMode" v-model="form.products" required rows="3" placeholder="ระบุรายละเอียดสินค้า ชนิดดอกไม้ โทนสี จำนวน..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm"></textarea>
-
-                        <div v-else class="space-y-2">
-                            <div v-for="item in form.items" :key="item.id" class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 relative space-y-2">
-                                <button v-if="form.items.length > 1" type="button" @click="removeFormItem(item.id)" class="absolute top-1.5 right-1.5 text-rose-400 hover:text-rose-600 text-xs p-2">
-                                    <i class="fa-solid fa-xmark"></i>
-                                </button>
-                                <input v-model="item.details" type="text" placeholder="รายละเอียดสินค้า เช่น ช่อกุหลาบแดง 9 ดอก" class="w-full pr-8 px-2.5 py-2 border border-slate-200 rounded-lg text-sm">
-                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                    <input v-model.number="item.qty" type="number" inputmode="numeric" placeholder="จำนวน" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
-                                    <input v-model="item.unit" type="text" placeholder="หน่วย" class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
-                                    <input v-model.number="item.price" type="number" inputmode="decimal" placeholder="ราคา/หน่วย" class="w-full col-span-2 sm:col-span-1 px-2 py-2 border border-slate-200 rounded-lg text-sm min-w-0">
+                    <!-- 2 Items -->
+                    <section class="step-sec of-card space-y-3" :class="{ 'step-on': formStep === 1 }">
+                        <h4 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="hidden lg:inline-flex w-5 h-5 rounded-full bg-slate-800 text-white text-[11px] items-center justify-center shrink-0">2</span><span>สินค้าที่สั่ง</span><span class="text-rose-500">*</span><span class="text-[11px] font-normal text-slate-400">ใช้พิมพ์ในใบสั่งงาน</span></h4>
+                        <div>
+                            <div class="item-head text-[11px] font-semibold text-slate-500 px-0.5 mb-1">
+                                <span>รายละเอียด</span><span>จำนวน</span><span>หน่วย</span><span>ราคา/หน่วย</span><span class="text-right">รวม</span><span></span>
+                            </div>
+                            <div class="space-y-2">
+                                <div v-for="(item, idx) in form.items" :key="item.id" class="item-row relative p-3 rounded-xl border border-slate-200 bg-slate-50 sm:p-0 sm:border-0 sm:bg-transparent">
+                                    <input :id="idx === 0 ? 'f-item-first' : null" :data-item-details="item.id" v-model="item.details" @input="formErrors.items = ''" type="text" autocomplete="off" placeholder="เช่น ช่อกุหลาบแดง 9 ดอก" class="item-details w-full px-3.5 py-3 sm:py-1.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500" :class="idx === 0 && formErrors.items ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200'">
+                                    <input v-model.number="item.qty" type="number" inputmode="numeric" min="0" placeholder="1" class="w-full px-2 py-3 sm:py-1.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200 min-w-0">
+                                    <input v-model="item.unit" type="text" placeholder="ช่อ" class="w-full px-2 py-3 sm:py-1.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200 min-w-0">
+                                    <input :data-item-price="item.id" v-model.number="item.price" type="number" inputmode="decimal" min="0" placeholder="0" class="w-full px-2 py-3 sm:py-1.5 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200 min-w-0">
+                                    <div class="item-total text-sm font-semibold text-slate-700"><span class="sm:hidden font-normal text-slate-400">รวม </span>฿{{ formatNumber((Number(item.qty) || 0) * (Number(item.price) || 0)) }}</div>
+                                    <button v-if="form.items.length > 1" type="button" tabindex="-1" @click="removeFormItem(item.id)" title="ลบรายการนี้" class="item-remove text-slate-400 hover:text-rose-600 text-xs p-2 sm:p-1">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                    <span v-else class="hidden sm:block"></span>
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between gap-2 pt-1">
-                                <button type="button" @click="addFormItem" class="text-xs px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-medium">
+                            <p v-if="formErrors.items" class="text-[11px] text-rose-600 mt-1">{{ formErrors.items }}</p>
+                            <div class="flex items-center justify-between gap-2 mt-2">
+                                <button type="button" @click="addFormItem" class="text-xs px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-medium transition-colors">
                                     <i class="fa-solid fa-plus"></i> เพิ่มสินค้า
                                 </button>
-                                <span class="text-xs font-bold text-slate-600">
-                                    รวมสินค้า ฿{{ formatNumber(formItemsTotal) }}<span v-if="form.deliveryType === 'shipping' && form.shippingFee"> + ค่าส่ง ฿{{ formatNumber(form.shippingFee) }}</span> = ฿{{ formatNumber(formItemsGrandTotal) }}
-                                </span>
+                                <span class="hidden sm:inline text-[11px] text-slate-400">กด Enter ที่ช่องราคา เพื่อเพิ่มบรรทัดใหม่</span>
+                                <span class="text-xs font-bold text-slate-600">รวมสินค้า ฿{{ formatNumber(formItemsTotal) }}</span>
                             </div>
-                            <p class="text-[11px] text-slate-400">ยอดรวม (รวมค่าส่งแล้ว) และรายละเอียดสินค้าจะถูกคำนวณ/สร้างให้อัตโนมัติจากรายการนี้ตอนบันทึกออเดอร์</p>
                         </div>
-                    </div>
 
-                    </div>
-                    <!-- STEP 2 -->
-                    <div class="step-sec space-y-4" :class="{ 'step-on': formStep === 2 }">
-                    <!-- Dates -->
-                    <div class="grid grid-cols-2 gap-3 sm:gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">วันที่สั่ง <span class="text-rose-500">*</span></label>
-                            <input v-model="form.orderDate" required type="date" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุ</label>
+                            <input v-model="form.notes" type="text" placeholder="เช่น ห้ามใส่ดอกยิปโซสีฟ้า" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200">
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">กำหนดส่ง / นัดรับ <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
-                            <input v-model="form.deliveryDate" type="date" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                        </div>
-                        <div v-if="form.deliveryType === 'pickup'" class="col-span-2">
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">เวลานัดรับ <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
-                            <input v-model="form.deliveryTime" type="time" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                        </div>
-                    </div>
-
-                    <!-- SHIPPING MODE -->
-                    <div v-if="form.deliveryType === 'shipping'" class="bg-sky-50/70 p-3 sm:p-4 rounded-xl border border-sky-200 space-y-3">
-                        <div class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
-                            <i class="fa-solid fa-box text-sky-600"></i>
-                            <span>รายละเอียดการจัดส่งพัสดุ</span>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">ที่อยู่จัดส่งพัสดุเต็ม <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
-                            <textarea v-model="form.location" rows="3" placeholder="ที่อยู่ผู้รับ..." class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">ค่าจัดส่ง (บาท)</label>
-                            <input v-model.number="form.shippingFee" min="0" type="number" inputmode="decimal" placeholder="0" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                            <p class="text-[11px] text-slate-400 mt-1">{{ formItemizedMode ? 'รวมเข้ายอดรวมด้านล่างให้อัตโนมัติ' : 'ถ้ากรอกยอดรวมเองด้านล่าง อย่าลืมรวมค่าส่งไว้ด้วย' }}</p>
-                        </div>
-                    </div>
-
-                    <!-- PICKUP MODE -->
-                    <!-- PICKUP MODE -->
-                    <div v-else-if="form.deliveryType === 'pickup'" class="bg-indigo-50/70 p-4 rounded-xl border border-indigo-200 space-y-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">สถานที่นัดรับ / หน้าร้าน</label>
-                            <input v-model="form.location" type="text" placeholder="หน้าร้าน..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div class="flex items-center justify-between pt-1">
-                            <label class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                                <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
-                                <span>ปักหมุดจุดนัดรับบนแผนที่</span>
-                            </label>
-                            <button type="button" @click="useCurrentLocation" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg shadow-2xs">
-                                <i class="fa-solid fa-crosshairs"></i> ตำแหน่งปัจจุบัน
-                            </button>
-                        </div>
-                        <div id="order-map" class="border border-indigo-200 shadow-inner"></div>
-                        <div class="grid grid-cols-2 gap-3 text-xs pt-1">
-                            <div>
-                                <span class="text-slate-500 block">Lat:</span>
-                                <input v-model.number="form.lat" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block">Lng:</span>
-                                <input v-model.number="form.lng" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
-                            </div>
-                        </div>
-                    </div>
-
-                    </div>
-                    <!-- STEP 3 -->
-                    <div class="step-sec space-y-4" :class="{ 'step-on': formStep === 3 }">
-                    <!-- Financial Details -->
-                    <div class="p-3 sm:p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
-                        <span class="text-xs font-bold text-slate-700 block">💰 รายละเอียดการชำระเงิน</span>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">ยอดรวม (บาท)</label>
-                                <input v-if="!formItemizedMode" v-model.number="form.totalAmount" min="0" type="number" inputmode="decimal" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-semibold">
-                                <div v-else class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 bg-slate-100 rounded-xl text-sm font-bold text-slate-700" title="คำนวณจากรายการสินค้าด้านบน">
-                                    ฿{{ formatNumber(formItemsGrandTotal) }}
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">มัดจำ/ชำระแล้ว (บาท)</label>
-                                <input v-model.number="form.depositAmount" :readonly="formHasPayments" min="0" type="number" inputmode="decimal" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-semibold" :class="formHasPayments ? 'bg-slate-100 text-slate-600' : 'bg-white'">
-                                <p v-if="formHasPayments" class="text-[11px] text-slate-400 mt-1 leading-snug">มาจากประวัติรับเงิน แก้ที่ปุ่ม "บันทึกการชำระเงิน" บนการ์ดออเดอร์</p>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl">
-                            <span class="text-xs font-medium text-slate-600">ยอดคงเหลือ</span>
-                            <span class="text-base font-black" :class="formRemainingAmount > 0 ? 'text-rose-600' : 'text-emerald-600'">฿{{ formatNumber(formRemainingAmount) }}</span>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">รูปแบบการชำระเงิน (สำหรับข้อความแจ้งลูกค้า)</label>
-                            <select v-model="form.paymentMode" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                                <option value="default">💖 โอนเต็ม/มัดจำ (ให้ลูกค้าเลือกได้)</option>
-                                <option value="transfer_only">💰 โอนเต็มจำนวนเท่านั้น</option>
-                                <option value="cod">🚚 เก็บเงินปลายทาง</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- More details (collapsed by default) -->
-                    <div>
-                        <button type="button" @click="showMoreFields = !showMoreFields" class="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-slate-700 transition-colors">
-                            <span class="flex items-center gap-2 min-w-0">
-                                <i class="fa-solid fa-sliders text-slate-500"></i>
-                                <span>รายละเอียดเพิ่มเติม</span>
-                                <span class="text-[11px] font-normal text-slate-400 truncate">คิว · หมายเหตุ · รูป<span v-if="form.deliveryType === 'shipping'"> · เลขพัสดุ</span></span>
-                            </span>
-                            <i class="fa-solid text-xs text-slate-400" :class="showMoreFields ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                        </button>
-
-                        <div v-show="showMoreFields" class="mt-4 space-y-4">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-700 mb-1">คิวที่ / Queue No.</label>
-                                    <input v-model="form.queueNo" type="text" placeholder="เช่น 01 หรือ A-01" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-bold text-pink-600">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-700 mb-1">ประจำเดือน / ฤดูกาล</label>
-                                    <input v-model="form.orderMonth" type="text" placeholder="เช่น มกราคม 2026 หรือ วาเลนไทน์" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">หมายเหตุเพิ่มเติม</label>
-                                <input v-model="form.notes" type="text" placeholder="เช่น ห้ามใส่ดอกยิปโซสีฟ้า..." class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                            </div>
-
-                            <div v-if="form.deliveryType === 'shipping'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-700 mb-1">บริษัทขนส่ง</label>
-                                    <select v-model="form.expressCompany" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
-                                        <option value="Flash Express">Flash Express</option>
-                                        <option value="J&T Express">J&T Express</option>
-                                        <option value="ไปรษณีย์ไทย (EMS)">ไปรษณีย์ไทย (EMS)</option>
-                                        <option value="Kerry Express">Kerry Express</option>
-                                        <option value="อื่นๆ">อื่นๆ</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-700 mb-1">เลขพัสดุ (Tracking No.)</label>
-                                    <input v-model="form.trackingNumber" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="เช่น EX123456789TH" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-mono">
-                                </div>
-                            </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">รูปภาพตัวอย่างช่อดอกไม้ / แบบงาน (สำหรับใบสั่งงาน) — แนบได้สูงสุด {{ MAX_ORDER_IMAGES }} รูป</label>
@@ -1568,7 +1449,141 @@
                             </div>
                         </details>
                     </div>
+                    </section>
+                    </div>
+
+                    <!-- RIGHT: when, where, how much -->
+                    <div class="of-col">
+                    <!-- 3 Dates & delivery -->
+                    <section class="step-sec of-card space-y-3" :class="{ 'step-on': formStep === 2 }">
+                        <h4 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="hidden lg:inline-flex w-5 h-5 rounded-full bg-slate-800 text-white text-[11px] items-center justify-center shrink-0">3</span><span>วันที่ &amp; การจัดส่ง</span></h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="f-orderDate" class="block text-xs font-semibold text-slate-700 mb-1">วันที่สั่ง <span class="text-rose-500">*</span></label>
+                                <input id="f-orderDate" v-model="form.orderDate" @input="formErrors.orderDate = ''" type="date" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500" :class="formErrors.orderDate ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200'">
+                                <p v-if="formErrors.orderDate" class="text-[11px] text-rose-600 mt-1">{{ formErrors.orderDate }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">กำหนดส่ง / นัดรับ</label>
+                                <input v-model="form.deliveryDate" type="date" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200">
+                            </div>
+                            <div v-if="form.deliveryType === 'pickup'" class="col-span-2">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">เวลานัดรับ</label>
+                                <input v-model="form.deliveryTime" type="time" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200">
+                            </div>
                         </div>
+
+                        <!-- SHIPPING MODE -->
+                        <div v-if="form.deliveryType === 'shipping'" class="bg-sky-50/70 p-3 rounded-xl border border-sky-200 space-y-3">
+                            <div class="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                                <i class="fa-solid fa-box text-sky-600"></i>
+                                <span>ที่อยู่จัดส่งพัสดุ</span>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">ที่อยู่ผู้รับ</label>
+                                <textarea v-model="form.location" rows="2" placeholder="ชื่อ ที่อยู่ รหัสไปรษณีย์ เบอร์ผู้รับ" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">ค่าจัดส่ง (บาท)</label>
+                                <input v-model.number="form.shippingFee" min="0" type="number" inputmode="decimal" placeholder="0" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200">
+                            </div>
+                        </div>
+
+                        <!-- PICKUP MODE -->
+                    <div v-else-if="form.deliveryType === 'pickup'" class="bg-indigo-50/70 p-4 rounded-xl border border-indigo-200 space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">สถานที่นัดรับ / หน้าร้าน</label>
+                            <input v-model="form.location" type="text" placeholder="หน้าร้าน..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <label class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                                <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
+                                <span>ปักหมุดจุดนัดรับบนแผนที่</span>
+                            </label>
+                            <button type="button" @click="useCurrentLocation" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg shadow-2xs">
+                                <i class="fa-solid fa-crosshairs"></i> ตำแหน่งปัจจุบัน
+                            </button>
+                        </div>
+                        <div id="order-map" class="border border-indigo-200 shadow-inner"></div>
+                        <div class="grid grid-cols-2 gap-3 text-xs pt-1">
+                            <div>
+                                <span class="text-slate-500 block">Lat:</span>
+                                <input v-model.number="form.lat" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block">Lng:</span>
+                                <input v-model.number="form.lng" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
+                            </div>
+                        </div>
+                    </div>
+                    </section>
+
+                    <!-- 4 Money -->
+                    <section class="step-sec of-card space-y-3" :class="{ 'step-on': formStep === 3 }">
+                        <h4 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="hidden lg:inline-flex w-5 h-5 rounded-full bg-slate-800 text-white text-[11px] items-center justify-center shrink-0">4</span><span>สรุปเงิน</span></h4>
+                        <div class="text-sm space-y-1">
+                            <div class="flex justify-between text-slate-500"><span>ค่าสินค้า</span><span>฿{{ formatNumber(formItemsTotal) }}</span></div>
+                            <div v-if="form.deliveryType === 'shipping'" class="flex justify-between text-slate-500"><span>ค่าจัดส่ง</span><span>฿{{ formatNumber(Number(form.shippingFee) || 0) }}</span></div>
+                            <div class="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1.5"><span>ยอดรวม</span><span>฿{{ formatNumber(formItemsGrandTotal) }}</span></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">มัดจำ / ชำระแล้ว (บาท)</label>
+                            <input v-model.number="form.depositAmount" :readonly="formHasPayments" min="0" type="number" inputmode="decimal" placeholder="0" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200 font-semibold" :class="formHasPayments ? 'bg-slate-100 text-slate-600' : ''">
+                            <p v-if="formHasPayments" class="text-[11px] text-slate-400 mt-1 leading-snug">มาจากประวัติรับเงิน แก้ที่ปุ่ม "บันทึกการชำระเงิน" บนการ์ดออเดอร์</p>
+                        </div>
+                        <div class="flex items-center justify-between px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                            <span class="text-xs font-medium text-slate-600">ยอดคงเหลือ</span>
+                            <span class="text-lg font-black" :class="formRemainingAmount > 0 ? 'text-rose-600' : 'text-emerald-600'">฿{{ formatNumber(formRemainingAmount) }}</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">รูปแบบการชำระเงิน <span class="font-normal text-slate-400">(ใช้ในข้อความแจ้งลูกค้า)</span></label>
+                            <select v-model="form.paymentMode" class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 border-slate-200">
+                                <option value="default">💖 โอนเต็ม/มัดจำ (ให้ลูกค้าเลือกได้)</option>
+                                <option value="transfer_only">💰 โอนเต็มจำนวนเท่านั้น</option>
+                                <option value="cod">🚚 เก็บเงินปลายทาง</option>
+                            </select>
+                        </div>
+                    </section>
+
+                    <!-- More (collapsed) -->
+                    <div class="step-sec" :class="{ 'step-on': formStep === 3 }">
+                        <button type="button" @click="showMoreFields = !showMoreFields" class="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-slate-700 transition-colors">
+                            <span class="flex items-center gap-2 min-w-0">
+                                <i class="fa-solid fa-sliders text-slate-500"></i>
+                                <span>ตั้งค่าเพิ่มเติม</span>
+                                <span class="text-[11px] font-normal text-slate-400 truncate">คิว · ประจำเดือน<span v-if="form.deliveryType === 'shipping'"> · ขนส่ง · เลขพัสดุ</span></span>
+                            </span>
+                            <i class="fa-solid text-xs text-slate-400" :class="showMoreFields ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <div v-show="showMoreFields" class="mt-4 space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">คิวที่ / Queue No.</label>
+                                    <input v-model="form.queueNo" type="text" placeholder="เช่น 01 หรือ A-01" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-bold text-pink-600">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">ประจำเดือน / ฤดูกาล</label>
+                                    <input v-model="form.orderMonth" type="text" placeholder="เช่น มกราคม 2026 หรือ วาเลนไทน์" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                                </div>
+                            </div>
+                            <div v-if="form.deliveryType === 'shipping'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">บริษัทขนส่ง</label>
+                                    <select v-model="form.expressCompany" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                                        <option value="Flash Express">Flash Express</option>
+                                        <option value="J&T Express">J&T Express</option>
+                                        <option value="ไปรษณีย์ไทย (EMS)">ไปรษณีย์ไทย (EMS)</option>
+                                        <option value="Kerry Express">Kerry Express</option>
+                                        <option value="อื่นๆ">อื่นๆ</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">เลขพัสดุ (Tracking No.)</label>
+                                    <input v-model="form.trackingNumber" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="เช่น EX123456789TH" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-mono">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                     </div>
                     </div>
@@ -1577,8 +1592,9 @@
                     <div class="shrink-0 px-4 sm:px-6 pt-3 bg-white border-t border-slate-100 flex items-center gap-2 sm:gap-3" style="padding-bottom: max(12px, env(safe-area-inset-bottom));">
                         <div class="min-w-0 mr-auto leading-tight">
                             <div class="text-[10px] text-slate-400">ยอดรวม</div>
-                            <div class="text-sm sm:text-base font-black text-slate-900 truncate">฿{{ formatNumber(formItemizedMode ? formItemsGrandTotal : form.totalAmount) }}</div>
+                            <div class="text-sm sm:text-base font-black text-slate-900 truncate">฿{{ formatNumber(formItemsGrandTotal) }}</div>
                         </div>
+                        <span class="hidden lg:block text-[11px] text-slate-400">Ctrl + Enter เพื่อบันทึก</span>
                         <button type="button" @click="closeModal" :class="formStep > 1 ? 'hidden sm:block' : ''" class="px-4 py-3 sm:py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium rounded-xl text-sm">
                             ยกเลิก
                         </button>
@@ -2171,20 +2187,62 @@
                         if (n === 2 && form.value.deliveryType === 'pickup') initOrderMap(form.value.lat, form.value.lng);
                     });
                 }
+                const formErrors = ref({});
+                function validateForm(onlyStep) {
+                    const e = {};
+                    if (!onlyStep || onlyStep === 1) {
+                        if (!String(form.value.customerName || '').trim()) e.customerName = 'กรุณากรอกชื่อลูกค้า';
+                        if (!(form.value.items || []).some(i => String(i.details || '').trim())) e.items = 'กรุณากรอกรายละเอียดสินค้าอย่างน้อย 1 รายการ';
+                    }
+                    if (!onlyStep || onlyStep === 2) {
+                        if (!form.value.orderDate) e.orderDate = 'กรุณาเลือกวันที่สั่ง';
+                    }
+                    formErrors.value = e;
+                    const firstKey = ['customerName', 'items', 'orderDate'].find(k => e[k]);
+                    if (!firstKey) return true;
+                    const targetStep = firstKey === 'orderDate' ? 2 : 1;
+                    const targetId = { customerName: 'f-customerName', items: 'f-item-first', orderDate: 'f-orderDate' }[firstKey];
+                    const focusIt = () => {
+                        const el = document.getElementById(targetId);
+                        if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); }
+                    };
+                    if (isMobileForm() && formStep.value !== targetStep) { goToStep(targetStep); nextTick(focusIt); } else { focusIt(); }
+                    return false;
+                }
                 function nextStep() {
                     // validate only the fields on the current step (other steps are hidden on mobile)
-                    const sec = document.querySelector('form.order-form .step-sec.step-on');
-                    if (sec) {
-                        const bad = Array.from(sec.querySelectorAll('input[required], textarea[required], select[required]')).find(el => !el.checkValidity());
-                        if (bad) { bad.reportValidity(); return; }
-                    }
+                    if (!validateForm(formStep.value)) return;
                     if (formStep.value < 3) goToStep(formStep.value + 1);
                 }
                 function prevStep() { if (formStep.value > 1) goToStep(formStep.value - 1); }
                 function onFormSubmit() {
                     // On mobile, pressing Enter / submit before the last step just moves to the next step
                     if (isMobileForm() && formStep.value < 3) { nextStep(); return; }
+                    if (!validateForm()) return;
                     saveOrder();
+                }
+                function focusNextField(el) {
+                    const formEl = el.closest('form');
+                    if (!formEl) return;
+                    const list = Array.from(formEl.querySelectorAll('input, select, textarea')).filter(f =>
+                        !f.disabled && !f.readOnly && f.type !== 'hidden' && f.type !== 'file' && f.type !== 'radio' && f.offsetParent !== null);
+                    const i = list.indexOf(el);
+                    if (i > -1 && list[i + 1]) list[i + 1].focus();
+                }
+                // Enter = go to next field (never saves by accident); Ctrl/Cmd+Enter = save
+                function onFormKeydown(e) {
+                    if (e.key !== 'Enter' || e.isComposing) return;
+                    const el = e.target;
+                    if (e.ctrlKey || e.metaKey) { e.preventDefault(); onFormSubmit(); return; }
+                    if (!el || el.tagName !== 'INPUT' || ['button', 'submit', 'checkbox', 'radio', 'file'].includes(el.type)) return;
+                    e.preventDefault();
+                    const items = form.value.items || [];
+                    const last = items[items.length - 1];
+                    if (el.dataset.itemPrice !== undefined && last && String(last.id) === el.dataset.itemPrice && String(last.details || '').trim()) {
+                        addFormItem();
+                        return;
+                    }
+                    focusNextField(el);
                 }
                 const isStoreModalOpen = ref(false);
                 const isEditing = ref(false);
@@ -2523,7 +2581,21 @@
                 }
 
                 function addFormItem() {
-                    form.value.items.push({ id: Date.now() + Math.random(), details: '', qty: 1, unit: 'ช่อ', price: 0 });
+                    const id = Date.now() + Math.random();
+                    form.value.items.push({ id, details: '', qty: 1, unit: 'ช่อ', price: '' });
+                    nextTick(() => {
+                        const el = document.querySelector('[data-item-details="' + id + '"]');
+                        if (el) el.focus();
+                    });
+                }
+
+                // Old orders saved as free text (no item rows): split the text into rows and keep the total unchanged
+                function seedItemsFromOrder(order) {
+                    const ship = order.deliveryType === 'shipping' ? (Number(order.shippingFee) || 0) : 0;
+                    const base = Math.max(0, (Number(order.totalAmount) || 0) - ship);
+                    const lines = String(order.products || '').split('\n').map(t => t.trim()).filter(Boolean);
+                    if (!lines.length) lines.push('');
+                    return lines.map((t, idx) => ({ id: Date.now() + idx + Math.random(), details: t, qty: 1, unit: 'ช่อ', price: idx === 0 && base ? base : '' }));
                 }
 
                 function removeFormItem(id) {
@@ -3079,16 +3151,16 @@
                         editingId.value = order.id;
                         form.value = {
                             ...order,
-                            items: (order.items && order.items.length ? order.items.map(i => ({ ...i })) : []),
+                            items: (order.items && order.items.length ? order.items.map(i => ({ ...i })) : seedItemsFromOrder(order)),
                             images: getOrderImages(order).map(img => ({ ...img }))
                         };
-                        formItemizedMode.value = !!(order.items && order.items.length > 0);
-                        showMoreFields.value = !!((order.notes && order.notes.trim()) || form.value.images.length || order.trackingNumber);
+                        formItemizedMode.value = true;
+                        showMoreFields.value = !!order.trackingNumber;
                     } else {
                         showMoreFields.value = false;
                         isEditing.value = false;
                         editingId.value = null;
-                        formItemizedMode.value = false;
+                        formItemizedMode.value = true;
                         
                         // Remember last customer phone/location or defaults to make entry faster
                         const lastOrder = orders.value.length > 0 ? orders.value[0] : null;
@@ -3099,7 +3171,7 @@
                             queueNo: String(orders.value.length + 1).padStart(2, '0'),
                             orderMonth: 'กันยายน 2026',
                             products: '',
-                            items: [],
+                            items: [{ id: Date.now() + Math.random(), details: '', qty: 1, unit: 'ช่อ', price: '' }],
                             notes: '',
                             images: [],
                             orderDate: new Date().toISOString().split('T')[0],
@@ -3119,6 +3191,7 @@
                         };
                     }
                     formStep.value = 1;
+                    formErrors.value = {};
                     isModalOpen.value = true;
                     if (form.value.deliveryType === 'pickup' && !isMobileForm()) initOrderMap(form.value.lat, form.value.lng);
                 }
@@ -3367,6 +3440,10 @@
                 }
 
                 function saveOrder() {
+                    // drop untouched blank rows and make qty/price real numbers
+                    form.value.items = (form.value.items || [])
+                        .filter(i => String(i.details || '').trim() || Number(i.price))
+                        .map(i => ({ ...i, qty: Number(i.qty) || 0, price: Number(i.price) || 0 }));
                     if (formItemizedMode.value && form.value.items && form.value.items.length > 0) {
                         // Itemized mode: products text + totalAmount are derived from the item rows (+ shipping fee)
                         form.value.products = form.value.items
@@ -3738,7 +3815,7 @@
                     isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
                     isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip, deliveryLabel, timeSuffix, isFinishedStatus,
                     quickEdit, quickForm, quickInput, quickOrder, quickTitle, quickPay, quickNewTotal, openQuickEdit, closeQuickEdit, saveQuickEdit, quickPayFull,
-                    isModalOpen, showMoreFields, formStep, formStepTitles, formScroll, nextStep, prevStep, onFormSubmit, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
+                    isModalOpen, showMoreFields, formStep, formStepTitles, formScroll, nextStep, prevStep, onFormSubmit, formErrors, onFormKeydown, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
                     filteredOrders, activeOrdersCount, statusCounts, completedCount, cancelledCount, totalOrderCount, thisMonthCount, desktopStatusTabs, typeTabs, hasActiveFilters, clearAllFilters, isMoreMenuOpen, cardMoreId, isRangeOpen, rangeFrom, rangeTo, rangeLabel, rangeStats, setRangePreset, clearRange, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
