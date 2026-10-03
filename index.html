@@ -354,6 +354,29 @@
         </div>
 
 
+        <!-- Unpaid-balance warning when marking an order as completed -->
+        <div v-if="unpaidConfirm" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-slate-900/50 no-print" @click.self="resolveUnpaid('cancel')">
+            <div class="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-xl p-5" style="padding-bottom: max(20px, env(safe-area-inset-bottom));">
+                <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 shrink-0 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="min-w-0">
+                        <div class="text-base font-bold text-slate-900">ออเดอร์นี้ยังชำระไม่ครบ</div>
+                        <div class="text-xs text-slate-500 truncate">{{ unpaidConfirm.name }}</div>
+                    </div>
+                </div>
+                <div class="mt-3 rounded-xl bg-rose-50 border border-rose-100 p-3 text-sm space-y-1">
+                    <div class="flex justify-between text-slate-600"><span>ยอดรวม</span><span class="font-semibold">฿{{ formatNumber(unpaidConfirm.total) }}</span></div>
+                    <div class="flex justify-between text-slate-600"><span>ชำระแล้ว</span><span class="font-semibold text-emerald-600">฿{{ formatNumber(unpaidConfirm.paid) }}</span></div>
+                    <div class="flex justify-between border-t border-rose-100 pt-1 font-bold text-rose-600"><span>ยังค้างอยู่</span><span>฿{{ formatNumber(unpaidConfirm.remaining) }}</span></div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <button type="button" @click="resolveUnpaid('paid')" class="w-full py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold active:bg-emerald-700">รับชำระครบแล้ว และเปลี่ยนเป็นส่งสำเร็จ</button>
+                    <button type="button" @click="resolveUnpaid('keep')" class="w-full py-3 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-sm font-semibold active:bg-amber-100">ส่งสำเร็จ (ยังค้างชำระอยู่)</button>
+                    <button type="button" @click="resolveUnpaid('cancel')" class="w-full py-3 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">ยกเลิก ไม่เปลี่ยนสถานะ</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Quick-edit sheet: fill one missing detail without opening the full form -->
         <div v-if="quickEdit && quickOrder" class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/50 no-print" @click.self="closeQuickEdit">
             <form @submit.prevent="saveQuickEdit" class="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto" style="padding-bottom: max(16px, env(safe-area-inset-bottom));">
@@ -456,7 +479,7 @@
                 </div>
             </div>
 
-            <div class="flex gap-2.5 overflow-x-auto hide-scrollbar md:overflow-visible md:grid md:grid-cols-4 md:gap-3 md:mt-4 md:pt-4 md:border-t border-slate-100">
+            <div class="flex gap-2.5 overflow-x-auto hide-scrollbar md:overflow-visible md:grid md:grid-cols-3 md:gap-3 md:mt-4 md:pt-4 md:border-t border-slate-100">
                 <div class="bg-slate-50 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[12.5rem] md:min-w-0 border-slate-100">
                     <div class="grid grid-cols-2 gap-2">
                         <div>
@@ -481,10 +504,6 @@
                 <div class="bg-amber-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-amber-100/80">
                     <span class="text-[11px] sm:text-xs font-medium text-amber-700 block">รอส่งพัสดุ / นัดรับ</span>
                     <span class="text-lg sm:text-xl font-bold text-amber-800">{{ pendingCount }} <span class="text-xs font-normal text-amber-600">รายการ</span></span>
-                </div>
-                <div class="bg-emerald-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-emerald-100/80">
-                    <span class="text-[11px] sm:text-xs font-medium text-emerald-700 block">ยอดรวมมัดจำแล้ว</span>
-                    <span class="text-lg sm:text-xl font-bold text-emerald-800">฿{{ formatNumber(totalDepositSum) }}</span>
                 </div>
                 <div class="bg-rose-50/60 rounded-xl p-2.5 sm:p-3 border shrink-0 min-w-[9.5rem] md:min-w-0 border-rose-100/80">
                     <span class="text-[11px] sm:text-xs font-medium text-rose-700 block">ยอดค้างชำระรวม</span>
@@ -2399,10 +2418,34 @@
                 function getProgressColor(status) { return status === 'completed' ? 'bg-emerald-400' : 'bg-pink-400'; }
                 function getProgressDotColor(status) { return status === 'completed' ? 'bg-emerald-500 border-emerald-500' : 'bg-pink-500 border-pink-500'; }
 
+                const unpaidConfirm = ref(null);
                 function handleStatusChange(order, event) {
                     const newStatus = event.target.value;
+                    // Marking as completed while money is still owed: ask first, and snap the dropdown back until the user decides
+                    if (newStatus === 'completed' && order.status !== 'completed' && getRemainingBalance(order) > 0) {
+                        event.target.value = order.status;
+                        unpaidConfirm.value = {
+                            id: order.id, name: order.customerName || '',
+                            total: Number(order.totalAmount) || 0,
+                            paid: Number(order.depositAmount) || 0,
+                            remaining: getRemainingBalance(order)
+                        };
+                        return;
+                    }
+                    applyStatusChange(order, newStatus);
+                }
+                function resolveUnpaid(choice) {
+                    const u = unpaidConfirm.value;
+                    unpaidConfirm.value = null;
+                    if (!u || choice === 'cancel') return;
+                    const order = orders.value.find(o => o.id === u.id);
+                    if (!order) return;
+                    applyStatusChange(order, 'completed', choice === 'paid' ? { depositAmount: u.total } : null);
+                }
+                function applyStatusChange(order, newStatus, extra) {
                     order.status = newStatus;
                     const statusUpdate = { status: newStatus };
+                    if (extra) { Object.assign(statusUpdate, extra); Object.assign(order, extra); }
                     if (newStatus === 'completed') {
                         statusUpdate.completedAt = localDateString();
                     } else if (order.completedAt) {
@@ -3466,7 +3509,7 @@
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
                     openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
                     getRemainingBalance, getDeliveryUrgency, getDistance, formatNumber, formatDate, getStatusClass,
-                    getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange,
+                    getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange, unpaidConfirm, resolveUnpaid,
                     printSingleWorkOrder, openBatchPrintModal, openReceiptModal, triggerPrintReceipt,
                     copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
                     handleFormImageUpload, rotateFormImage, removeFormImage, isCompressingImage,
