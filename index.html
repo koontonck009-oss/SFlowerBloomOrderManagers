@@ -414,15 +414,37 @@
                             <div class="bg-slate-50 rounded-xl p-2"><div class="text-slate-400">ชำระแล้ว</div><div class="font-bold text-emerald-600">฿{{ formatNumber(quickPay.cur) }}</div></div>
                             <div class="bg-slate-50 rounded-xl p-2"><div class="text-slate-400">คงเหลือ</div><div class="font-bold" :class="quickPay.curRemaining > 0 ? 'text-rose-600' : 'text-emerald-600'">฿{{ formatNumber(quickPay.curRemaining) }}</div></div>
                         </div>
-                        <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
-                            <button type="button" @click="quickForm.mode = 'add'" class="py-2 rounded-lg" :class="quickForm.mode === 'add' ? 'bg-white shadow-sm text-pink-600' : 'text-slate-500'">ลูกค้าโอนเพิ่ม</button>
-                            <button type="button" @click="quickForm.mode = 'set'" class="py-2 rounded-lg" :class="quickForm.mode === 'set' ? 'bg-white shadow-sm text-pink-600' : 'text-slate-500'">แก้ยอดที่ชำระแล้ว</button>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-700">{{ quickPay.editing ? 'แก้ไขรายการรับเงิน' : 'เพิ่มรับเงิน' }}</span>
+                            <button v-if="quickPay.editing" type="button" @click="cancelPaymentEdit" class="text-xs text-slate-500 underline">ยกเลิกการแก้ไข</button>
                         </div>
-                        <input ref="quickInput" v-model="quickForm.amount" type="number" inputmode="decimal" step="any" :placeholder="quickForm.mode === 'add' ? 'ลูกค้าโอนเพิ่มกี่บาท' : 'ยอดที่ชำระแล้วทั้งหมด (บาท)'" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-semibold">
-                        <button v-if="quickPay.curRemaining > 0" type="button" @click="quickPayFull" class="w-full py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 text-sm font-semibold">✓ ชำระครบ (฿{{ formatNumber(quickPay.curRemaining) }})</button>
+                        <input ref="quickInput" v-model="quickForm.amount" type="number" inputmode="decimal" step="any" placeholder="จำนวนเงินที่รับ (บาท)" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                        <button v-if="!quickPay.editing && quickPay.baseRemaining > 0" type="button" @click="quickPayFull" class="w-full py-2.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 text-sm font-semibold">✓ ชำระครบ (฿{{ formatNumber(quickPay.baseRemaining) }})</button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input v-model="quickForm.payDate" type="date" style="font-size:16px" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                            <select v-model="quickForm.payMethod" style="font-size:16px" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                                <option v-for="m in PAY_METHODS" :key="m" :value="m">{{ m }}</option>
+                            </select>
+                        </div>
+                        <input v-model="quickForm.payNote" type="text" autocomplete="off" placeholder="หมายเหตุ (ไม่บังคับ) เช่น มัดจำงวดที่ 2" style="font-size:16px" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
                         <div v-if="quickPay.hasAmount" class="rounded-xl px-3.5 py-2.5 text-sm border" :class="quickPay.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-700'">
-                            <template v-if="quickPay.valid">หลังบันทึก: ชำระแล้ว <b>฿{{ formatNumber(quickPay.next) }}</b> · คงเหลือ <b>฿{{ formatNumber(quickPay.remaining) }}</b></template>
-                            <template v-else>ยอดที่ชำระแล้วติดลบไม่ได้</template>
+                            <template v-if="quickPay.valid">หลังบันทึก: ชำระแล้ว <b>฿{{ formatNumber(quickPay.next) }}</b> · คงเหลือ <b>฿{{ formatNumber(quickPay.remaining) }}</b>
+                                <div v-if="quickPay.over" class="text-xs text-amber-700 mt-0.5">ยอดที่รับเกินยอดรวมออเดอร์ ฿{{ formatNumber(quickPay.next - quickPay.total) }}</div></template>
+                            <template v-else>จำนวนเงินต้องมากกว่า 0</template>
+                        </div>
+                        <div class="pt-1">
+                            <div class="text-xs font-bold text-slate-700 mb-1.5">ประวัติรับเงิน <span class="font-normal text-slate-400">({{ paymentHistory.length }} รายการ)</span></div>
+                            <div v-if="!paymentHistory.length" class="text-xs text-slate-400 bg-slate-50 rounded-xl p-3 text-center">ยังไม่มีรายการรับเงิน</div>
+                            <ul v-else class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                                <li v-for="p in paymentHistory" :key="p.id" class="flex items-center gap-2 pl-3 pr-1 py-1.5" :class="quickForm.payEditId === p.id ? 'bg-pink-50' : 'bg-white'">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-sm font-semibold text-emerald-700">฿{{ formatNumber(p.amount) }}</div>
+                                        <div class="text-[11px] text-slate-500 truncate">{{ formatDate(p.date) }}<span v-if="p.method"> · {{ p.method }}</span><span v-if="p.note"> · {{ p.note }}</span></div>
+                                    </div>
+                                    <button type="button" @click="editPaymentEntry(p)" title="แก้ไข" class="w-9 h-9 hover:bg-slate-100 text-slate-500 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    <button type="button" @click="deletePaymentEntry(p)" title="ลบ" class="w-9 h-9 hover:bg-rose-50 text-rose-500 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+                                </li>
+                            </ul>
                         </div>
                     </div>
 
@@ -1072,7 +1094,7 @@
                     </div>
                 </div>
                 <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">
-                    <i class="fa-solid fa-circle-info mr-1"></i>รายรับจากออเดอร์นับเมื่อสถานะเป็น "ส่งสำเร็จ" ด้วยยอดเต็ม ตามวันที่กดส่งสำเร็จ (ออเดอร์เก่าที่ยังไม่มีวันที่นี้ใช้วันกำหนดส่งแทน) ออเดอร์ที่ยังไม่เสร็จหรือยกเลิกไม่ถูกนับ
+                    <i class="fa-solid fa-circle-info mr-1"></i>รายรับจากออเดอร์นับตามเงินที่รับจริงในแต่ละรายการ ตามวันที่รับเงิน (ดู/แก้ได้ที่ปุ่ม "บันทึกการชำระเงิน" บนการ์ดออเดอร์) ออเดอร์เก่าที่ไม่มีประวัติจะใช้ยอดเดิมลงวันที่ส่งสำเร็จ ออเดอร์ที่ยกเลิกไม่ถูกนับ หากยึดมัดจำไว้ให้เพิ่มเป็นรายรับเอง
                 </p>
             </div>
 
@@ -1094,6 +1116,23 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 -mt-1">
+                <div class="bg-white rounded-xl px-4 py-3 border border-slate-200 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <span class="text-xs font-medium text-slate-600 block">ยอดขายที่ส่งมอบแล้ว</span>
+                        <span class="text-[11px] text-slate-400">ยอดเต็มของออเดอร์ที่ส่งสำเร็จในช่วงนี้</span>
+                    </div>
+                    <span class="text-base font-bold text-slate-800 shrink-0">฿{{ formatNumber(accDeliveredSales) }}</span>
+                </div>
+                <div class="bg-amber-50/60 rounded-xl px-4 py-3 border border-amber-100 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <span class="text-xs font-medium text-amber-800 block">มัดจำรับล่วงหน้า (ยังไม่ส่งมอบ)</span>
+                        <span class="text-[11px] text-amber-600">เงินที่รับในช่วงนี้ของออเดอร์ที่ยังไม่เสร็จ</span>
+                    </div>
+                    <span class="text-base font-bold text-amber-800 shrink-0">฿{{ formatNumber(accAdvanceDeposits) }}</span>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4">
                     <div class="flex items-center justify-between mb-3">
@@ -1103,15 +1142,17 @@
                             <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>จ่าย</span>
                         </div>
                     </div>
-                    <div class="flex items-end justify-between gap-2">
-                        <div v-for="m in accChart" :key="m.key" class="flex-1 min-w-0 flex flex-col items-center gap-1">
-                            <div class="w-full flex items-end justify-center gap-0.5" style="height:108px" :title="m.label + ' | รับ ฿' + formatNumber(m.income) + ' | จ่าย ฿' + formatNumber(m.expense)">
-                                <div class="w-1/2 max-w-[20px] rounded-t bg-emerald-400" :style="{ height: m.incomeH + 'px' }"></div>
-                                <div class="w-1/2 max-w-[20px] rounded-t bg-rose-400" :style="{ height: m.expenseH + 'px' }"></div>
-                            </div>
-                            <span class="text-[10px] text-slate-500 whitespace-nowrap">{{ m.label }}</span>
-                        </div>
-                    </div>
+                    <p class="text-[11px] text-slate-400 mb-1">กดที่เดือนเพื่อดูรายละเอียดเดือนนั้น</p>
+                    <svg viewBox="0 0 360 144" class="w-full h-auto select-none" role="img" aria-label="กราฟรายรับรายจ่าย 6 เดือนล่าสุด">
+                        <line x1="0" y1="118" x2="360" y2="118" stroke="#e2e8f0" stroke-width="1"></line>
+                        <g v-for="(m, i) in accChart" :key="m.key" @click="accSelectMonth(m.key)" style="cursor:pointer">
+                            <title>{{ m.label }} | รับ ฿{{ formatNumber(m.income) }} | จ่าย ฿{{ formatNumber(m.expense) }}</title>
+                            <rect :x="i * 60 + 2" y="0" width="56" height="144" rx="8" :fill="(!accAllMonths && accMonth === m.key) ? '#fdf2f8' : 'transparent'"></rect>
+                            <rect :x="i * 60 + 12" :y="118 - m.incomeH" width="16" :height="m.incomeH" rx="3" fill="#34d399"></rect>
+                            <rect :x="i * 60 + 32" :y="118 - m.expenseH" width="16" :height="m.expenseH" rx="3" fill="#fb7185"></rect>
+                            <text :x="i * 60 + 30" y="135" text-anchor="middle" font-size="10" :fill="(!accAllMonths && accMonth === m.key) ? '#be185d' : '#64748b'" :font-weight="(!accAllMonths && accMonth === m.key) ? 700 : 400">{{ m.label }}</text>
+                        </g>
+                    </svg>
                 </div>
 
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4">
@@ -1422,7 +1463,8 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-slate-600 mb-1">มัดจำ/ชำระแล้ว (บาท)</label>
-                                <input v-model.number="form.depositAmount" min="0" type="number" inputmode="decimal" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-semibold">
+                                <input v-model.number="form.depositAmount" :readonly="formHasPayments" min="0" type="number" inputmode="decimal" class="w-full px-3.5 py-3 sm:py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 font-semibold" :class="formHasPayments ? 'bg-slate-100 text-slate-600' : 'bg-white'">
+                                <p v-if="formHasPayments" class="text-[11px] text-slate-400 mt-1 leading-snug">มาจากประวัติรับเงิน แก้ที่ปุ่ม "บันทึกการชำระเงิน" บนการ์ดออเดอร์</p>
                             </div>
                         </div>
                         <div class="flex items-center justify-between px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl">
@@ -1852,6 +1894,12 @@
                             <span>ชำระแล้ว:</span>
                             <span class="font-semibold">฿{{ formatNumber(receiptTarget.depositAmount) }}</span>
                         </div>
+                        <template v-if="effectivePayments(receiptTarget).length > 1">
+                            <div v-for="p in effectivePayments(receiptTarget)" :key="p.id" class="flex justify-between text-[11px] text-slate-500 pl-3">
+                                <span>{{ formatDate(p.date) }}<span v-if="p.method"> · {{ p.method }}</span><span v-if="p.note"> · {{ p.note }}</span></span>
+                                <span>฿{{ formatNumber(p.amount) }}</span>
+                            </div>
+                        </template>
                         <div class="flex justify-between text-sm font-bold pt-2 border-t border-slate-200" :class="getRemainingBalance(receiptTarget) > 0 ? 'text-rose-600' : 'text-emerald-600'">
                             <span>ยอดคงเหลือ:</span>
                             <span>฿{{ formatNumber(getRemainingBalance(receiptTarget)) }}</span>
@@ -1976,7 +2024,7 @@
 
                 // ---------- Quick edit (fill in a single missing detail from the card) ----------
                 const quickEdit = ref(null); // { type, id }
-                const quickForm = ref({ text: '', date: '', time: '', amount: '', mode: 'add', details: '', price: '' });
+                const quickForm = ref({ text: '', date: '', time: '', amount: '', mode: 'add', details: '', price: '', payDate: '', payMethod: 'โอน', payNote: '', payEditId: '' });
                 const quickInput = ref(null);
                 const quickOrder = computed(() => quickEdit.value ? (orders.value.find(o => o.id === quickEdit.value.id) || null) : null);
                 const quickTitle = computed(() => {
@@ -1989,12 +2037,17 @@
                     const o = quickOrder.value;
                     const total = o ? (Number(o.totalAmount) || 0) : 0;
                     const cur = o ? (Number(o.depositAmount) || 0) : 0;
-                    const raw = quickForm.value.amount;
-                    const n = Number(raw);
-                    const hasAmount = raw !== '' && raw !== null && !isNaN(n);
-                    const next = quickForm.value.mode === 'add' ? cur + (hasAmount ? n : 0) : (hasAmount ? n : cur);
-                    return { total, cur, curRemaining: Math.max(0, total - cur), next, remaining: Math.max(0, total - next), hasAmount, valid: hasAmount && next >= 0 };
+                    const f = quickForm.value;
+                    const editing = o && f.payEditId ? effectivePayments(o).find(p => p.id === f.payEditId) : null;
+                    const base = roundMoney(cur - (editing ? (Number(editing.amount) || 0) : 0));
+                    const n = Number(f.amount);
+                    const hasAmount = f.amount !== '' && f.amount !== null && !isNaN(n);
+                    const next = roundMoney(base + (hasAmount ? n : 0));
+                    return { total, cur, curRemaining: Math.max(0, total - cur), baseRemaining: Math.max(0, roundMoney(total - base)), next, remaining: Math.max(0, roundMoney(total - next)), hasAmount, valid: hasAmount && n > 0, over: hasAmount && total > 0 && next > total, editing: !!editing };
                 });
+                const paymentHistory = computed(() => effectivePayments(quickOrder.value)
+                    .map(p => ({ ...p }))
+                    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))));
                 function quickItemsTotalOf(o) {
                     const ship = o.deliveryType === 'shipping' ? (Number(o.shippingFee) || 0) : 0;
                     return (o.items || []).reduce((sum, i) => sum + (Number(i.qty) || 0) * (Number(i.price) || 0), 0) + ship;
@@ -2010,15 +2063,52 @@
                     quickEdit.value = { type, id: order.id };
                     quickForm.value = {
                         text: type === 'phone' ? (order.customerPhone || '') : (type === 'address' ? (order.location || '') : ''),
-                        date: order.deliveryDate || '', time: order.deliveryTime || '', amount: '', mode: 'add', details: '', price: ''
+                        date: order.deliveryDate || '', time: order.deliveryTime || '', amount: '', mode: 'add', details: '', price: '',
+                        payDate: localDateString(), payMethod: 'โอน', payNote: '', payEditId: ''
                     };
                     setTimeout(() => { if (quickInput.value && quickInput.value.focus) quickInput.value.focus(); }, 120);
                 }
                 function closeQuickEdit() { quickEdit.value = null; }
                 watch(quickEdit, (v) => { document.body.style.overflow = v ? 'hidden' : ''; });
+                function resetPayForm() {
+                    Object.assign(quickForm.value, { amount: '', payDate: localDateString(), payMethod: 'โอน', payNote: '', payEditId: '' });
+                }
                 function quickPayFull() {
-                    quickForm.value.mode = 'add';
-                    quickForm.value.amount = String(quickPay.value.curRemaining);
+                    quickForm.value.amount = String(quickPay.value.baseRemaining);
+                }
+                function cancelPaymentEdit() { resetPayForm(); }
+                function editPaymentEntry(p) {
+                    Object.assign(quickForm.value, { amount: String(p.amount), payDate: String(p.date || localDateString()).slice(0, 10), payMethod: p.method || 'โอน', payNote: p.note || '', payEditId: p.id });
+                    setTimeout(() => { if (quickInput.value && quickInput.value.focus) quickInput.value.focus(); }, 60);
+                }
+                function deletePaymentEntry(p) {
+                    const o = quickOrder.value;
+                    if (!o) return;
+                    if (!window.confirm(`ลบรายการรับเงิน ฿${formatNumber(p.amount)} (${formatDate(p.date)}) ?`)) return;
+                    if (quickForm.value.payEditId === p.id) resetPayForm();
+                    mutatePayments(o.id, list => list.filter(x => x.id !== p.id))
+                        .then(() => showToast('ลบรายการรับเงินแล้ว'))
+                        .catch(() => showToast('ลบไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                }
+                function savePaymentEntry(o) {
+                    const p = quickPay.value, f = quickForm.value;
+                    if (!p.hasAmount) { showToast('กรุณากรอกจำนวนเงิน'); return; }
+                    if (!p.valid) { showToast('จำนวนเงินต้องมากกว่า 0'); return; }
+                    if (!f.payDate) { showToast('กรุณาเลือกวันที่รับเงิน'); return; }
+                    const editId = f.payEditId;
+                    const entry = { id: editId || newPaymentId(), date: f.payDate, amount: roundMoney(f.amount), method: f.payMethod || '', note: (f.payNote || '').trim() };
+                    mutatePayments(o.id, list => {
+                        const i = editId ? list.findIndex(x => x.id === editId) : -1;
+                        if (i >= 0) list[i] = entry; else list.push(entry);
+                    }).then(() => {
+                        if (editId) { showToast('แก้ไขรายการรับเงินแล้ว'); return; }
+                        showToast('บันทึกการรับเงินแล้ว', () => {
+                            mutatePayments(o.id, list => list.filter(x => x.id !== entry.id))
+                                .then(() => showToast('ยกเลิกรายการรับเงินแล้ว'))
+                                .catch(() => showToast('ย้อนกลับไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                        });
+                    }).catch(() => showToast('บันทึกไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                    closeQuickEdit();
                 }
                 function saveQuickEdit() {
                     const q = quickEdit.value, o = quickOrder.value;
@@ -2028,14 +2118,7 @@
                     if (q.type === 'phone') { patch = { customerPhone: (quickForm.value.text || '').trim() }; msg = 'บันทึกเบอร์โทรแล้ว'; }
                     else if (q.type === 'address') { patch = { location: (quickForm.value.text || '').trim() }; msg = o.deliveryType === 'shipping' ? 'บันทึกที่อยู่จัดส่งแล้ว' : 'บันทึกสถานที่นัดรับแล้ว'; }
                     else if (q.type === 'date') { patch = { deliveryDate: quickForm.value.date || '' }; if (o.deliveryType === 'pickup') patch.deliveryTime = quickForm.value.date ? (quickForm.value.time || '') : ''; msg = quickForm.value.date ? 'บันทึกวันส่งแล้ว' : 'ล้างวันส่งแล้ว'; }
-                    else if (q.type === 'payment') {
-                        const p = quickPay.value;
-                        if (!p.hasAmount) { showToast('กรุณากรอกจำนวนเงิน'); return; }
-                        if (!p.valid) { showToast('ยอดที่ชำระแล้วติดลบไม่ได้'); return; }
-                        // "add" uses an atomic increment so a payment entered on another device at the same time is not lost
-                        patch = { depositAmount: quickForm.value.mode === 'add' ? inc(Number(quickForm.value.amount)) : Number(quickForm.value.amount) };
-                        msg = 'บันทึกการชำระเงินแล้ว';
-                    }
+                    else if (q.type === 'payment') { savePaymentEntry(o); return; }
                     else if (q.type === 'addItem') {
                         const details = (quickForm.value.details || '').trim();
                         if (!details) { showToast('กรุณากรอกรายการสินค้าที่เพิ่ม'); return; }
@@ -2260,6 +2343,38 @@
                     return calculateDistance(storeLocation.value.lat, storeLocation.value.lng, order.lat, order.lng);
                 }
 
+                // ---------- ประวัติรับเงิน (payments) ----------
+                // ออเดอร์เก็บ payments: [{id, date, amount, method, note}] และ depositAmount = ผลรวมเสมอ
+                // ออเดอร์เก่าที่ไม่มี payments จะแสดงเป็นรายการ "ยอดเดิม" โดยอัตโนมัติ (ไม่ต้อง migrate)
+                const PAY_METHODS = ['โอน', 'เงินสด', 'อื่นๆ'];
+                function newPaymentId() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+                function roundMoney(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+                function sumPayments(list) { return roundMoney((list || []).reduce((s, p) => s + (Number(p.amount) || 0), 0)); }
+                function legacyPaymentsOf(o) {
+                    const amt = Number(o && o.depositAmount) || 0;
+                    if (amt <= 0) return [];
+                    const date = (o.status === 'completed' ? (o.completedAt || o.deliveryDate || o.orderDate) : o.orderDate) || localDateString();
+                    return [{ id: 'legacy', date: String(date).slice(0, 10), amount: amt, method: '', note: 'ยอดเดิม' }];
+                }
+                function effectivePayments(o) {
+                    if (!o) return [];
+                    return Array.isArray(o.payments) ? o.payments : legacyPaymentsOf(o);
+                }
+                function paymentDateOf(o, p) { return String((p && p.date) || (o && o.orderDate) || '').slice(0, 10); }
+                // แก้ประวัติรับเงินแบบอะตอมิก (ธุรกรรม) กันสองเครื่องบันทึกพร้อมกันแล้วยอดหาย; extra = ฟิลด์อื่นที่ต้องเขียนพร้อมกัน
+                function mutatePayments(orderId, mutate, extra) {
+                    const ref = db.collection('orders').doc(orderId);
+                    return db.runTransaction(async (tx) => {
+                        const snap = await tx.get(ref);
+                        if (!snap.exists) throw new Error('order-missing');
+                        const d = snap.data();
+                        const cur = Array.isArray(d.payments) ? d.payments.map(p => ({ ...p })) : legacyPaymentsOf(d);
+                        const out = mutate(cur, d);
+                        const next = Array.isArray(out) ? out : cur;
+                        tx.update(ref, { ...(extra || {}), payments: next, depositAmount: sumPayments(next) });
+                    });
+                }
+
                 function getRemainingBalance(order) {
                     if (!order || order.status === 'cancelled') return 0; // cancelled orders carry no outstanding balance
                     return Math.max(0, (Number(order.totalAmount) || 0) - (Number(order.depositAmount) || 0));
@@ -2388,6 +2503,7 @@
                     const total = formItemizedMode.value ? formItemsGrandTotal.value : (Number(form.value.totalAmount) || 0);
                     return Math.max(0, total - (Number(form.value.depositAmount) || 0));
                 });
+                const formHasPayments = computed(() => isEditing.value && Array.isArray(form.value.payments) && form.value.payments.length > 0);
 
                 const formItemsTotal = computed(() => {
                     return (form.value.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.price) || 0), 0);
@@ -2503,13 +2619,13 @@
                     if (!u || choice === 'cancel') return;
                     const order = orders.value.find(o => o.id === u.id);
                     if (!order) return;
-                    applyStatusChange(order, 'completed', choice === 'paid' ? { depositAmount: u.total } : null);
+                    applyStatusChange(order, 'completed', choice === 'paid' ? { payRemaining: true } : null);
                 }
-                function applyStatusChange(order, newStatus, extra) {
-                    const prev = { status: order.status, completedAt: order.completedAt || '', depositAmount: order.depositAmount };
+                function applyStatusChange(order, newStatus, opts) {
+                    const payRemaining = !!(opts && opts.payRemaining);
+                    const prev = { status: order.status, completedAt: order.completedAt || '' };
                     order.status = newStatus;
                     const statusUpdate = { status: newStatus };
-                    if (extra) { Object.assign(statusUpdate, extra); Object.assign(order, extra); }
                     if (newStatus === 'completed') {
                         statusUpdate.completedAt = localDateString();
                     } else if (order.completedAt) {
@@ -2520,16 +2636,26 @@
                     if (statusFilter.value === 'active' && isFinishedStatus(newStatus)) {
                         // The card is about to leave this view — drop it from the print selection and tell the user where it went
                         selectedForPrint.value = selectedForPrint.value.filter(id => id !== order.id);
-                        doneMsg = newStatus === 'completed' ? 'ย้ายไปที่ "ส่งสำเร็จ" แล้ว' : 'ย้ายไปที่ "ยกเลิก" แล้ว';
+                        doneMsg = newStatus === 'completed' ? 'ย้ายไปที่ \"ส่งสำเร็จ\" แล้ว' : 'ย้ายไปที่ \"ยกเลิก\" แล้ว';
                     }
-                    db.collection('orders').doc(order.id).update(statusUpdate)
-                        .catch(() => showToast('อัปเดตสถานะไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                    const back = { status: prev.status, completedAt: prev.completedAt };
+                    let write, undoWrite;
+                    if (payRemaining) {
+                        // รับชำระส่วนที่เหลือ = เพิ่มรายการรับเงินวันนี้ พร้อมเปลี่ยนสถานะในธุรกรรมเดียว
+                        const entryId = newPaymentId(), today = localDateString();
+                        write = () => mutatePayments(order.id, (list, d) => {
+                            const rest = roundMoney((Number(d.totalAmount) || 0) - sumPayments(list));
+                            if (rest > 0) list.push({ id: entryId, date: today, amount: rest, method: '', note: 'ชำระส่วนที่เหลือตอนส่งมอบ' });
+                        }, statusUpdate);
+                        undoWrite = () => mutatePayments(order.id, list => list.filter(p => p.id !== entryId), back);
+                    } else {
+                        write = () => db.collection('orders').doc(order.id).update(statusUpdate);
+                        undoWrite = () => db.collection('orders').doc(order.id).update(back);
+                    }
+                    write().catch(() => showToast('อัปเดตสถานะไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                     showToast(doneMsg, () => {
-                        const back = { status: prev.status, completedAt: prev.completedAt };
-                        if (extra && 'depositAmount' in extra) back.depositAmount = Number(prev.depositAmount) || 0;
                         Object.assign(order, back);
-                        db.collection('orders').doc(order.id).update(back)
-                            .catch(() => showToast('ย้อนกลับไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
+                        undoWrite().catch(() => showToast('ย้อนกลับไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
                         showToast('ย้อนกลับแล้ว');
                     });
                 }
@@ -3260,6 +3386,15 @@
                     // ช่องเงินที่เว้นว่างไว้ ให้บันทึกเป็น 0 (กันค่าว่างไปทำให้การคำนวณที่อื่นพัง)
                     form.value.totalAmount = Number(form.value.totalAmount) || 0;
                     form.value.depositAmount = Number(form.value.depositAmount) || 0;
+                    // เงินมัดจำเก็บเป็นประวัติรับเงิน (payments) และ depositAmount ต้องเท่ากับผลรวมเสมอ
+                    if (Array.isArray(form.value.payments)) {
+                        if (!form.value.payments.length && form.value.depositAmount > 0) {
+                            form.value.payments = [{ id: newPaymentId(), date: localDateString(), amount: form.value.depositAmount, method: '', note: '' }];
+                        }
+                        form.value.depositAmount = sumPayments(form.value.payments);
+                    } else if (!isEditing.value && form.value.depositAmount > 0) {
+                        form.value.payments = [{ id: newPaymentId(), date: String(form.value.orderDate || localDateString()).slice(0, 10), amount: form.value.depositAmount, method: '', note: 'มัดจำ' }];
+                    }
 
                     if (form.value.deliveryType !== 'pickup' || !form.value.deliveryDate) form.value.deliveryTime = '';
                     if (isEditing.value) {
@@ -3338,16 +3473,19 @@
                 const editingTxId = ref(null);
                 const txForm = ref({ type: 'expense', date: '', category: ACC_EXPENSE_CATEGORIES[0], amount: '', note: '' });
 
+                // รายรับจากออเดอร์ = เงินที่รับจริงแต่ละรายการ ตามวันที่รับเงิน (ออเดอร์ที่ยกเลิกไม่นับ)
                 const accOrderEntries = computed(() => orders.value
-                    .filter(o => o.status === 'completed')
-                    .map(o => {
+                    .filter(o => o.status !== 'cancelled')
+                    .flatMap(o => {
                         const firstLine = String(o.products || '').split('\n')[0].trim();
-                        return {
-                            key: 'o-' + o.id, source: 'order', type: 'income',
-                            date: String(o.completedAt || o.deliveryDate || o.orderDate || '').slice(0, 10),
-                            category: 'ออเดอร์', amount: Number(o.totalAmount) || 0,
-                            note: [o.customerName, firstLine].filter(Boolean).join(' · ')
-                        };
+                        return effectivePayments(o)
+                            .filter(p => (Number(p.amount) || 0) > 0)
+                            .map(p => ({
+                                key: 'o-' + o.id + '-' + p.id, source: 'order', type: 'income',
+                                date: paymentDateOf(o, p),
+                                category: 'ออเดอร์', amount: Number(p.amount) || 0,
+                                note: [o.customerName, firstLine, [p.note, p.method].filter(Boolean).join(' / ')].filter(Boolean).join(' · ')
+                            }));
                     }));
                 const accManualEntries = computed(() => transactions.value.map(t => ({
                     key: 't-' + t.id, source: 'manual', id: t.id, type: t.type,
@@ -3372,6 +3510,21 @@
                 const accIncomeFromOrders = computed(() => accPeriodEntries.value
                     .filter(e => e.source === 'order').reduce((sum, e) => sum + e.amount, 0));
                 const accExpenseCount = computed(() => accPeriodEntries.value.filter(e => e.type === 'expense').length);
+
+                function accInPeriod(d) {
+                    const s = String(d || '').slice(0, 10);
+                    return accAllMonths.value || s.slice(0, 7) === accMonth.value;
+                }
+                // ตัวรอง 1: ยอดเต็มของออเดอร์ที่ส่งมอบแล้วในช่วงนี้ (ตามวันที่ส่งสำเร็จ)
+                const accDeliveredSales = computed(() => orders.value
+                    .filter(o => o.status === 'completed' && accInPeriod(o.completedAt || o.deliveryDate || o.orderDate))
+                    .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0));
+                // ตัวรอง 2: เงินที่รับในช่วงนี้ แต่ออเดอร์ยังไม่ส่งมอบ (ไม่นับที่ยกเลิก)
+                const accAdvanceDeposits = computed(() => orders.value
+                    .filter(o => o.status !== 'completed' && o.status !== 'cancelled')
+                    .reduce((sum, o) => sum + effectivePayments(o)
+                        .filter(p => accInPeriod(paymentDateOf(o, p)))
+                        .reduce((s, p) => s + (Number(p.amount) || 0), 0), 0));
 
                 const accExpenseBreakdown = computed(() => {
                     const map = {};
@@ -3411,6 +3564,8 @@
                     const d = new Date(y, m - 1 + delta, 1);
                     accMonth.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 }
+
+                function accSelectMonth(key) { accAllMonths.value = false; accMonth.value = key; }
 
                 const txCategoryOptions = computed(() =>
                     txForm.value.type === 'income' ? ACC_INCOME_CATEGORIES : ACC_EXPENSE_CATEGORIES);
@@ -3606,7 +3761,9 @@
                     mainTab, transactions, accMonth, accAllMonths, accTypeFilter, isTxModalOpen, editingTxId, txForm,
                     accLedger, accIncome, accExpense, accProfit, accIncomeFromOrders, accExpenseCount,
                     accExpenseBreakdown, accChart, shiftAccMonth, txCategoryOptions, setTxType,
-                    openTxModal, closeTxModal, saveTx, deleteTx, exportAccountingCSV
+                    openTxModal, closeTxModal, saveTx, deleteTx, exportAccountingCSV,
+                    accDeliveredSales, accAdvanceDeposits, accSelectMonth,
+                    effectivePayments, formHasPayments, paymentHistory, editPaymentEntry, cancelPaymentEdit, deletePaymentEntry, PAY_METHODS
                 };
             }
         }).mount('#app');
