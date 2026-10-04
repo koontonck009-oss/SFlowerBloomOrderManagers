@@ -1116,23 +1116,6 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 -mt-1">
-                <div class="bg-white rounded-xl px-4 py-3 border border-slate-200 flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                        <span class="text-xs font-medium text-slate-600 block">ยอดขายที่ส่งมอบแล้ว</span>
-                        <span class="text-[11px] text-slate-400">ยอดเต็มของออเดอร์ที่ส่งสำเร็จในช่วงนี้</span>
-                    </div>
-                    <span class="text-base font-bold text-slate-800 shrink-0">฿{{ formatNumber(accDeliveredSales) }}</span>
-                </div>
-                <div class="bg-amber-50/60 rounded-xl px-4 py-3 border border-amber-100 flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                        <span class="text-xs font-medium text-amber-800 block">มัดจำรับล่วงหน้า (ยังไม่ส่งมอบ)</span>
-                        <span class="text-[11px] text-amber-600">เงินที่รับในช่วงนี้ของออเดอร์ที่ยังไม่เสร็จ</span>
-                    </div>
-                    <span class="text-base font-bold text-amber-800 shrink-0">฿{{ formatNumber(accAdvanceDeposits) }}</span>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4">
                     <div class="flex items-center justify-between mb-3">
@@ -3434,20 +3417,6 @@
                     .filter(e => e.source === 'order').reduce((sum, e) => sum + e.amount, 0));
                 const accExpenseCount = computed(() => accPeriodEntries.value.filter(e => e.type === 'expense').length);
 
-                function accInPeriod(d) {
-                    const s = String(d || '').slice(0, 10);
-                    return accAllMonths.value || s.slice(0, 7) === accMonth.value;
-                }
-                // ตัวรอง 1: ยอดเต็มของออเดอร์ที่ส่งมอบแล้วในช่วงนี้ (ตามวันที่ส่งสำเร็จ)
-                const accDeliveredSales = computed(() => orders.value
-                    .filter(o => o.status === 'completed' && accInPeriod(o.completedAt || o.deliveryDate || o.orderDate))
-                    .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0));
-                // ตัวรอง 2: เงินที่รับในช่วงนี้ แต่ออเดอร์ยังไม่ส่งมอบ (ไม่นับที่ยกเลิก)
-                const accAdvanceDeposits = computed(() => orders.value
-                    .filter(o => o.status !== 'completed' && o.status !== 'cancelled')
-                    .reduce((sum, o) => sum + effectivePayments(o)
-                        .filter(p => accInPeriod(paymentDateOf(o, p)))
-                        .reduce((s, p) => s + (Number(p.amount) || 0), 0), 0));
 
                 const accExpenseBreakdown = computed(() => {
                     const map = {};
@@ -3676,7 +3645,7 @@
                     accLedger, accIncome, accExpense, accProfit, accIncomeFromOrders, accExpenseCount,
                     accExpenseBreakdown, accChart, shiftAccMonth, txCategoryOptions, setTxType,
                     openTxModal, closeTxModal, saveTx, deleteTx, exportAccountingCSV,
-                    accDeliveredSales, accAdvanceDeposits, accSelectMonth,
+                    accSelectMonth,
                     effectivePayments, formHasPayments, paymentHistory, editPaymentEntry, cancelPaymentEdit, deletePaymentEntry, PAY_METHODS
                 };
             }
