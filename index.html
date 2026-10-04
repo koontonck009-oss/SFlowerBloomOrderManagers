@@ -18,9 +18,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
-    <!-- Leaflet OpenStreetMap CDN -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
         tailwind.config = {
@@ -68,7 +65,6 @@
             .of-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
             .of-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
             .of-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1rem; }
-            #order-map { height: 160px; }
         }
         .hide-scrollbar { scrollbar-width: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -89,13 +85,6 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
-        }
-
-        #order-map, #store-map {
-            height: 200px;
-            width: 100%;
-            border-radius: 0.75rem;
-            z-index: 10;
         }
 
         /* Used briefly (off-screen) before printing, to measure each work order's natural
@@ -224,10 +213,6 @@
             </button>
             <div v-show="isMobileMenuOpen" class="fixed inset-0 z-40" @click="isMobileMenuOpen = false"></div>
             <div v-show="isMobileMenuOpen" class="absolute right-0 top-12 z-50 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-1.5">
-                <button @click="openStoreModal(); isMobileMenuOpen = false" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-700 hover:bg-slate-50 text-left">
-                    <i class="fa-solid fa-store w-5 text-center text-indigo-500"></i>
-                    <span class="truncate">ตำแหน่งร้าน: {{ storeLocation.name }}</span>
-                </button>
                 <button @click="exportDataJSON(); isMobileMenuOpen = false" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-700 hover:bg-slate-50 text-left">
                     <i class="fa-solid fa-file-export w-5 text-center text-slate-500"></i> ส่งออกข้อมูลสำรอง (Export)
                 </button>
@@ -319,7 +304,7 @@
                     <div>
                         <div class="text-xs font-semibold text-slate-500 mb-2">เรียงตาม</div>
                         <div class="space-y-1.5">
-                            <button v-for="o in [{v:'delivery_asc',t:'🚨 ด่วนสุด (กำหนดส่งใกล้นี้)'},{v:'created_desc',t:'🆕 ออเดอร์ใหม่ล่าสุด'},{v:'remaining_desc',t:'💰 ยอดค้างชำระ (มากไปน้อย)'},{v:'distance_asc',t:'📍 นัดรับใกล้ที่สุดก่อน (กม.)'}]" :key="o.v" @click="sortBy = o.v"
+                            <button v-for="o in [{v:'delivery_asc',t:'🚨 ด่วนสุด (กำหนดส่งใกล้นี้)'},{v:'created_desc',t:'🆕 ออเดอร์ใหม่ล่าสุด'},{v:'remaining_desc',t:'💰 ยอดค้างชำระ (มากไปน้อย)'}]" :key="o.v" @click="sortBy = o.v"
                                     :class="sortBy === o.v ? 'border-pink-500 bg-pink-50 text-pink-700 font-semibold' : 'border-slate-200 bg-white text-slate-700'"
                                     class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-sm text-left">
                                 <span>{{ o.t }}</span>
@@ -414,7 +399,13 @@
                     <input v-if="quickEdit.type === 'phone'" ref="quickInput" v-model="quickForm.text" type="tel" inputmode="tel" autocomplete="off" placeholder="เช่น 081-234-5678" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
 
                     <!-- address -->
-                    <textarea v-else-if="quickEdit.type === 'address'" ref="quickInput" v-model="quickForm.text" rows="4" :placeholder="quickOrder.deliveryType === 'shipping' ? 'ที่อยู่ผู้รับ...' : 'สถานที่นัดรับ...'" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500"></textarea>
+                    <div v-else-if="quickEdit.type === 'address'" class="space-y-2">
+                        <textarea ref="quickInput" v-model="quickForm.text" rows="4" :placeholder="quickOrder.deliveryType === 'shipping' ? 'ที่อยู่ผู้รับ...' : 'สถานที่นัดรับ...'" style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500"></textarea>
+                        <div v-if="quickOrder.deliveryType !== 'shipping'">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">ลิงก์ Google Maps <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+                            <input v-model="quickForm.mapLink" type="text" inputmode="url" autocomplete="off" placeholder="https://maps.app.goo.gl/..." style="font-size:16px" class="w-full px-3.5 py-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500">
+                        </div>
+                    </div>
 
                     <!-- delivery date -->
                     <div v-else-if="quickEdit.type === 'date'" class="space-y-2">
@@ -502,10 +493,6 @@
                         <i class="fa-solid fa-plus text-sm"></i>
                         <span>สร้างออเดอร์ใหม่</span>
                     </button>
-                    <button @click="openStoreModal()" title="ตั้งค่าตำแหน่งร้านค้า" class="min-w-0 max-w-[16rem] px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-all flex items-center gap-1.5">
-                        <i class="fa-solid fa-location-dot text-slate-400 shrink-0"></i>
-                        <span class="truncate">{{ storeLocation.name }}</span>
-                    </button>
                     <button @click="openBatchPrintModal" title="พิมพ์ใบสั่งงานที่เลือก" :class="selectedForPrint.length > 0 ? 'bg-pink-50 hover:bg-pink-100 text-pink-700 border-pink-200' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'" class="px-3 py-2 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 whitespace-nowrap">
                         <i class="fa-solid fa-print shrink-0" :class="selectedForPrint.length > 0 ? '' : 'text-slate-400'"></i>
                         <span>พิมพ์ใบสั่งงาน<span v-if="selectedForPrint.length > 0"> ({{ selectedForPrint.length }})</span></span>
@@ -580,7 +567,6 @@
                         <option value="delivery_asc">ด่วนสุด (กำหนดส่งใกล้สุด)</option>
                         <option value="created_desc">ออเดอร์ใหม่ล่าสุด</option>
                         <option value="remaining_desc">ยอดค้างชำระ (มากไปน้อย)</option>
-                        <option value="distance_asc">นัดรับใกล้ที่สุดก่อน (กม.)</option>
                     </select>
                 </label>
                 <select v-model="datePreset" class="shrink-0 h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-pink-300 cursor-pointer">
@@ -631,7 +617,6 @@
                             <option value="delivery_asc">🚨 ด่วนสุด (กำหนดส่งใกล้นี้)</option>
                             <option value="created_desc">🆕 ออเดอร์ใหม่ล่าสุด</option>
                             <option value="remaining_desc">💰 ยอดค้างชำระ (มากไปน้อย)</option>
-                            <option value="distance_asc">📍 นัดรับใกล้ที่สุดก่อน (กม.)</option>
                         </select>
                     </div>
                 </div>
@@ -856,12 +841,11 @@
                             <span>ติดตามพัสดุ</span>
                             <span class="font-mono text-xs opacity-80 tracking-wide">{{ order.trackingNumber }}</span>
                         </a>
-                        <a v-if="!isExpanded(order) && order.deliveryType !== 'shipping' && order.lat && order.lng"
-                           :href="`https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`" target="_blank" rel="noopener"
+                        <a v-if="!isExpanded(order) && order.deliveryType !== 'shipping' && mapUrlOf(order)"
+                           :href="mapUrlOf(order)" target="_blank" rel="noopener"
                            class="md:hidden w-full py-3 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
                             <i class="fa-solid fa-diamond-turn-right"></i>
                             <span>เปิดแผนที่ Google Maps</span>
-                            <span v-if="getDistance(order) !== null" class="text-xs opacity-80">📍 {{ getDistance(order) }} กม.</span>
                         </a>
 
                         <!-- Dates -->
@@ -903,13 +887,12 @@
                         <div v-else :class="isExpanded(order) ? '' : 'hidden md:block'" class="border-t border-slate-100 pt-3 text-xs space-y-1.5">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="font-semibold text-slate-500"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>จุดนัดรับสินค้า / หน้าร้าน</span>
-                                <span v-if="getDistance(order) !== null" class="text-[11px] font-semibold text-indigo-700">📍 {{ getDistance(order) }} กม. จากร้าน</span>
                             </div>
                             <p class="text-slate-700 line-clamp-2">{{ order.location || 'หน้าร้านค้าหลัก' }}</p>
                             <div class="flex items-center gap-x-4 gap-y-0.5 flex-wrap font-semibold">
                                 <button type="button" @click="openQuickEdit('address', order)" class="text-indigo-700 hover:underline py-1.5 md:py-1"><i class="fa-solid fa-pen text-[10px] mr-1"></i>แก้สถานที่นัดรับ</button>
-                                <a v-if="order.lat && order.lng" :href="`https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`" target="_blank" rel="noopener" class="text-indigo-700 hover:underline py-1.5 md:py-1"><i class="fa-solid fa-diamond-turn-right mr-1"></i>เปิดแผนที่ Google Maps</a>
-                                <span v-else class="text-[11px] text-slate-400 italic font-normal">ไม่ได้ปักหมุดพิกัด</span>
+                                <a v-if="mapUrlOf(order)" :href="mapUrlOf(order)" target="_blank" rel="noopener" class="text-indigo-700 hover:underline py-1.5 md:py-1"><i class="fa-solid fa-diamond-turn-right mr-1"></i>เปิดแผนที่ Google Maps</a>
+                                <span v-else class="text-[11px] text-slate-400 italic font-normal">ไม่มีลิงก์แผนที่</span>
                             </div>
                         </div>
                         <!-- Financial Summary -->
@@ -1021,9 +1004,6 @@
                             </div>
                             <div v-else>
                                 <div class="text-slate-700 truncate" :title="order.location">{{ order.location || 'หน้าร้าน' }}</div>
-                                <span v-if="getDistance(order) !== null" class="font-bold text-indigo-700 text-[11px]">
-                                    📍 {{ getDistance(order) }} กม.
-                                </span>
                             </div>
                         </td>
                         <td class="p-3 md:p-4 whitespace-nowrap">
@@ -1495,25 +1475,10 @@
                             <label class="block text-xs font-semibold text-slate-700 mb-1">สถานที่นัดรับ / หน้าร้าน</label>
                             <input v-model="form.location" type="text" placeholder="หน้าร้าน..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm">
                         </div>
-                        <div class="flex items-center justify-between pt-1">
-                            <label class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                                <i class="fa-solid fa-map-location-dot text-indigo-600"></i>
-                                <span>ปักหมุดจุดนัดรับบนแผนที่</span>
-                            </label>
-                            <button type="button" @click="useCurrentLocation" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg shadow-2xs">
-                                <i class="fa-solid fa-crosshairs"></i> ตำแหน่งปัจจุบัน
-                            </button>
-                        </div>
-                        <div id="order-map" class="border border-indigo-200 shadow-inner"></div>
-                        <div class="grid grid-cols-2 gap-3 text-xs pt-1">
-                            <div>
-                                <span class="text-slate-500 block">Lat:</span>
-                                <input v-model.number="form.lat" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block">Lng:</span>
-                                <input v-model.number="form.lng" type="number" inputmode="decimal" step="any" class="w-full px-2.5 py-2 bg-white border rounded-lg font-mono">
-                            </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1"><i class="fa-solid fa-map-location-dot text-indigo-600 mr-1"></i>ลิงก์ Google Maps จุดนัดรับ <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+                            <input id="f-mapLink" v-model="form.mapLink" @input="formErrors.mapLink = ''" type="text" inputmode="url" autocomplete="off" placeholder="วางลิงก์ เช่น https://maps.app.goo.gl/..." class="w-full px-3.5 py-3 sm:py-2 border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500" :class="formErrors.mapLink ? 'border-rose-400' : 'border-slate-200'">
+                            <p v-if="formErrors.mapLink" class="text-[11px] text-rose-600 mt-1">{{ formErrors.mapLink }}</p>
                         </div>
                     </div>
                     </section>
@@ -1613,35 +1578,6 @@
             </div>
         </div>
 
-        <div v-if="isStoreModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-sm no-print">
-            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6 space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <h3 class="font-bold text-slate-900 flex items-center gap-2">
-                        <i class="fa-solid fa-store text-indigo-600"></i> ตั้งค่าตำแหน่งร้านค้า
-                    </h3>
-                    <button @click="isStoreModalOpen = false" class="text-slate-400 hover:text-slate-600 p-1">
-                        <i class="fa-solid fa-xmark text-lg"></i>
-                    </button>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">ชื่อร้าน / สาขา</label>
-                    <input v-model="tempStore.name" type="text" class="w-full px-3 py-2.5 sm:py-2 border border-slate-200 rounded-xl text-sm">
-                </div>
-                <div>
-                    <div class="flex items-center justify-between mb-1.5 gap-2">
-                        <label class="text-xs font-semibold text-slate-700">ปักหมุดตำแหน่งร้านค้า</label>
-                        <button type="button" @click="useCurrentStoreLocation" class="px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg shrink-0">
-                            ตำแหน่งปัจจุบัน
-                        </button>
-                    </div>
-                    <div id="store-map" class="border border-slate-200"></div>
-                </div>
-                <div class="pt-3 border-t flex justify-end gap-2">
-                    <button @click="isStoreModalOpen = false" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 text-slate-600 text-xs font-medium rounded-xl border border-slate-200">ยกเลิก</button>
-                    <button @click="saveStoreLocation" class="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 bg-indigo-600 text-white text-xs font-medium rounded-xl">บันทึก</button>
-                </div>
-            </div>
-        </div>
 
         <!-- Customer Notification Message Modal -->
         <div v-if="isMessageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm no-print">
@@ -2079,6 +2015,7 @@
                     quickEdit.value = { type, id: order.id };
                     quickForm.value = {
                         text: type === 'phone' ? (order.customerPhone || '') : (type === 'address' ? (order.location || '') : ''),
+                        mapLink: order.mapLink || '',
                         date: order.deliveryDate || '', time: order.deliveryTime || '', amount: '', mode: 'add', details: '', price: '',
                         payDate: localDateString(), payMethod: 'โอน', payNote: '', payEditId: ''
                     };
@@ -2132,7 +2069,15 @@
                     const inc = (n) => firebase.firestore.FieldValue.increment(n);
                     let patch = null, msg = 'บันทึกเรียบร้อย';
                     if (q.type === 'phone') { patch = { customerPhone: (quickForm.value.text || '').trim() }; msg = 'บันทึกเบอร์โทรแล้ว'; }
-                    else if (q.type === 'address') { patch = { location: (quickForm.value.text || '').trim() }; msg = o.deliveryType === 'shipping' ? 'บันทึกที่อยู่จัดส่งแล้ว' : 'บันทึกสถานที่นัดรับแล้ว'; }
+                    else if (q.type === 'address') {
+                        patch = { location: (quickForm.value.text || '').trim() };
+                        if (o.deliveryType !== 'shipping') {
+                            const ml = (quickForm.value.mapLink || '').trim();
+                            if (ml && !isGoogleMapsLink(ml)) { showToast('ลิงก์ไม่ใช่ Google Maps'); return; }
+                            patch.mapLink = normalizeMapLink(ml);
+                        }
+                        msg = o.deliveryType === 'shipping' ? 'บันทึกที่อยู่จัดส่งแล้ว' : 'บันทึกสถานที่นัดรับแล้ว';
+                    }
                     else if (q.type === 'date') { patch = { deliveryDate: quickForm.value.date || '' }; if (o.deliveryType === 'pickup') patch.deliveryTime = quickForm.value.date ? (quickForm.value.time || '') : ''; msg = quickForm.value.date ? 'บันทึกวันส่งแล้ว' : 'ล้างวันส่งแล้ว'; }
                     else if (q.type === 'payment') { savePaymentEntry(o); return; }
                     else if (q.type === 'addItem') {
@@ -2184,7 +2129,6 @@
                     formStep.value = n;
                     nextTick(() => {
                         if (formScroll.value) formScroll.value.scrollTop = 0;
-                        if (n === 2 && form.value.deliveryType === 'pickup') initOrderMap(form.value.lat, form.value.lng);
                     });
                 }
                 const formErrors = ref({});
@@ -2196,12 +2140,13 @@
                     }
                     if (!onlyStep || onlyStep === 2) {
                         if (!form.value.orderDate) e.orderDate = 'กรุณาเลือกวันที่สั่ง';
+                        if (form.value.deliveryType === 'pickup' && String(form.value.mapLink || '').trim() && !isGoogleMapsLink(form.value.mapLink)) e.mapLink = 'ลิงก์ไม่ใช่ Google Maps (เช่น maps.app.goo.gl/... หรือ google.com/maps/...)';
                     }
                     formErrors.value = e;
-                    const firstKey = ['customerName', 'items', 'orderDate'].find(k => e[k]);
+                    const firstKey = ['customerName', 'items', 'orderDate', 'mapLink'].find(k => e[k]);
                     if (!firstKey) return true;
-                    const targetStep = firstKey === 'orderDate' ? 2 : 1;
-                    const targetId = { customerName: 'f-customerName', items: 'f-item-first', orderDate: 'f-orderDate' }[firstKey];
+                    const targetStep = (firstKey === 'orderDate' || firstKey === 'mapLink') ? 2 : 1;
+                    const targetId = { customerName: 'f-customerName', items: 'f-item-first', orderDate: 'f-orderDate', mapLink: 'f-mapLink' }[firstKey];
                     const focusIt = () => {
                         const el = document.getElementById(targetId);
                         if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); }
@@ -2244,7 +2189,6 @@
                     }
                     focusNextField(el);
                 }
-                const isStoreModalOpen = ref(false);
                 const isEditing = ref(false);
                 const editingId = ref(null);
                 const toastMessage = ref('');
@@ -2288,14 +2232,6 @@
                     includeNote: true
                 });
 
-                const storeLocation = ref({
-                    name: 'S.FLOWER BLOOM (สาขาหลัก)',
-                    lat: 13.7563,
-                    lng: 100.5018
-                });
-
-                const tempStore = ref({ ...storeLocation.value });
-
                 const form = ref({
                     customerName: '',
                     customerPhone: '',
@@ -2313,8 +2249,7 @@
                     trackingNumber: '',
                     shippingFee: 0,
                     location: '',
-                    lat: null,
-                    lng: null,
+                    mapLink: '',
                     totalAmount: 1500,
                     depositAmount: 500,
                     paymentMode: 'default',
@@ -2324,10 +2259,6 @@
                 const imageUrlInput = ref('');
                 const MAX_ORDER_IMAGES = 5;
 
-                let orderMap = null;
-                let orderMarker = null;
-                let storeMap = null;
-                let storeMarker = null;
 
                 const getTodayString = (offsetDays = 0) => {
                     const d = new Date();
@@ -2353,8 +2284,6 @@
                         trackingNumber: 'TH0192837465',
                         shippingFee: 50,
                         location: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตวัฒนา กรุงเทพฯ 10110',
-                        lat: null,
-                        lng: null,
                         totalAmount: 1850,
                         depositAmount: 1850,
                         paymentMode: 'transfer_only',
@@ -2377,29 +2306,12 @@
                         trackingNumber: '',
                         shippingFee: 0,
                         location: 'หน้าร้านหลัก S.FLOWER BLOOM',
-                        lat: 13.7380,
-                        lng: 100.5600,
                         totalAmount: 1200,
                         depositAmount: 500,
                         paymentMode: 'default',
                         status: 'ready'
                     }
                 ];
-
-                function calculateDistance(lat1, lon1, lat2, lon2) {
-                    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-                    const R = 6371;
-                    const dLat = (lat2 - lat1) * Math.PI / 180;
-                    const dLon = (lon2 - lon1) * Math.PI / 180;
-                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                    return Math.round(R * c * 10) / 10;
-                }
-
-                function getDistance(order) {
-                    if (order.deliveryType !== 'pickup') return null;
-                    return calculateDistance(storeLocation.value.lat, storeLocation.value.lng, order.lat, order.lng);
-                }
 
                 // ---------- ประวัติรับเงิน (payments) ----------
                 // ออเดอร์เก็บ payments: [{id, date, amount, method, note}] และ depositAmount = ผลรวมเสมอ
@@ -2639,6 +2551,32 @@
                         return 0;
                     });
                 });
+
+                // ---------- ลิงก์ Google Maps จุดนัดรับ ----------
+                function normalizeMapLink(v) {
+                    v = String(v || '').trim();
+                    if (!v) return '';
+                    if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+                    return v;
+                }
+                function isGoogleMapsLink(v) {
+                    try {
+                        const u = new URL(normalizeMapLink(v));
+                        const h = u.hostname.toLowerCase();
+                        const p = u.pathname.toLowerCase();
+                        if (h === 'maps.app.goo.gl' || h === 'maps.google.com') return true;
+                        if (h === 'goo.gl' || h === 'www.goo.gl') return p.startsWith('/maps');
+                        return /^(www\.)?google\.[a-z.]+$/.test(h) && p.startsWith('/maps');
+                    } catch (e) { return false; }
+                }
+                // ลิงก์ที่ใช้เปิดแผนที่: ใช้ mapLink ก่อน ออเดอร์เก่าที่มีแต่พิกัด lat/lng ยังเปิดได้
+                function mapUrlOf(order) {
+                    if (!order) return '';
+                    const link = normalizeMapLink(order.mapLink);
+                    if (link) return link;
+                    if (order.lat && order.lng) return `https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`;
+                    return '';
+                }
 
                 function formatNumber(num) { return new Intl.NumberFormat('th-TH').format(num || 0); }
                 function deliveryLabel(d) { return d ? formatDate(d) : 'ยังไม่กำหนดวัน'; }
@@ -3099,52 +3037,6 @@
                     showToast('คัดลอกที่อยู่จัดส่งเรียบร้อย!');
                 }
 
-                // Leaflet Map Init
-                function initOrderMap(lat, lng) {
-                    nextTick(() => {
-                        const mapElem = document.getElementById('order-map');
-                        if (!mapElem) return;
-                        const defaultLat = lat || storeLocation.value.lat;
-                        const defaultLng = lng || storeLocation.value.lng;
-
-                        if (!orderMap) {
-                            orderMap = L.map('order-map').setView([defaultLat, defaultLng], 13);
-                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(orderMap);
-                            orderMap.on('click', (e) => { updateOrderCoords(e.latlng.lat, e.latlng.lng); });
-                        } else {
-                            orderMap.setView([defaultLat, defaultLng], 13);
-                            orderMap.invalidateSize();
-                        }
-                        if (orderMarker) orderMap.removeLayer(orderMarker);
-                        if (lat && lng) orderMarker = L.marker([lat, lng]).addTo(orderMap);
-                    });
-                }
-
-                function updateOrderCoords(lat, lng) {
-                    form.value.lat = Math.round(lat * 100000) / 100000;
-                    form.value.lng = Math.round(lng * 100000) / 100000;
-                    if (orderMap) {
-                        if (orderMarker) orderMap.removeLayer(orderMarker);
-                        orderMarker = L.marker([lat, lng]).addTo(orderMap);
-                        orderMap.panTo([lat, lng]);
-                    }
-                }
-
-                function useCurrentLocation() {
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition((pos) => {
-                            updateOrderCoords(pos.coords.latitude, pos.coords.longitude);
-                            showToast('ดึงพิกัดปัจจุบันสำเร็จ!');
-                        });
-                    }
-                }
-
-                watch(() => form.value.deliveryType, (newVal) => {
-                    if (newVal === 'pickup' && isModalOpen.value) {
-                        initOrderMap(form.value.lat, form.value.lng);
-                    }
-                });
-
                 function openModal(order = null) {
                     if (order) {
                         isEditing.value = true;
@@ -3182,8 +3074,7 @@
                             trackingNumber: '',
                             shippingFee: lastOrder ? (lastOrder.shippingFee || 0) : 0,
                             location: lastOrder && lastOrder.deliveryType === 'pickup' ? lastOrder.location : '',
-                            lat: storeLocation.value.lat,
-                            lng: storeLocation.value.lng,
+                            mapLink: lastOrder && lastOrder.deliveryType === 'pickup' ? (lastOrder.mapLink || '') : '',
                             totalAmount: '',
                             depositAmount: '',
                             paymentMode: lastOrder ? (lastOrder.paymentMode || 'default') : 'default',
@@ -3193,56 +3084,10 @@
                     formStep.value = 1;
                     formErrors.value = {};
                     isModalOpen.value = true;
-                    if (form.value.deliveryType === 'pickup' && !isMobileForm()) initOrderMap(form.value.lat, form.value.lng);
                 }
 
                 function closeModal() {
                     isModalOpen.value = false;
-                    if (orderMap) { orderMap.remove(); orderMap = null; orderMarker = null; }
-                }
-
-                function openStoreModal() {
-                    tempStore.value = { ...storeLocation.value };
-                    isStoreModalOpen.value = true;
-                    nextTick(() => {
-                        if (!storeMap) {
-                            storeMap = L.map('store-map').setView([tempStore.value.lat, tempStore.value.lng], 13);
-                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(storeMap);
-                            storeMarker = L.marker([tempStore.value.lat, tempStore.value.lng]).addTo(storeMap);
-                            storeMap.on('click', (e) => {
-                                tempStore.value.lat = Math.round(e.latlng.lat * 100000) / 100000;
-                                tempStore.value.lng = Math.round(e.latlng.lng * 100000) / 100000;
-                                if (storeMarker) storeMap.removeLayer(storeMarker);
-                                storeMarker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(storeMap);
-                            });
-                        } else {
-                            storeMap.setView([tempStore.value.lat, tempStore.value.lng], 13);
-                            storeMap.invalidateSize();
-                        }
-                    });
-                }
-
-                function useCurrentStoreLocation() {
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition((pos) => {
-                            tempStore.value.lat = Math.round(pos.coords.latitude * 100000) / 100000;
-                            tempStore.value.lng = Math.round(pos.coords.longitude * 100000) / 100000;
-                            if (storeMap) {
-                                if (storeMarker) storeMap.removeLayer(storeMarker);
-                                storeMarker = L.marker([tempStore.value.lat, tempStore.value.lng]).addTo(storeMap);
-                                storeMap.panTo([tempStore.value.lat, tempStore.value.lng]);
-                            }
-                            showToast('ดึงพิกัดร้านค้าปัจจุบันสำเร็จ!');
-                        });
-                    }
-                }
-
-                function saveStoreLocation() {
-                    storeLocation.value = { ...tempStore.value };
-                    db.collection('settings').doc('store').set(storeLocation.value)
-                        .catch(() => showToast('บันทึกตำแหน่งร้านไม่สำเร็จ ตรวจสอบการเชื่อมต่อ'));
-                    isStoreModalOpen.value = false;
-                    showToast('บันทึกตำแหน่งร้านค้าเรียบร้อย');
                 }
 
                 const isCompressingImage = ref(false);
@@ -3473,6 +3318,7 @@
                         form.value.payments = [{ id: newPaymentId(), date: String(form.value.orderDate || localDateString()).slice(0, 10), amount: form.value.depositAmount, method: '', note: 'มัดจำ' }];
                     }
 
+                    form.value.mapLink = form.value.deliveryType === 'pickup' ? normalizeMapLink(form.value.mapLink) : '';
                     if (form.value.deliveryType !== 'pickup' || !form.value.deliveryDate) form.value.deliveryTime = '';
                     if (isEditing.value) {
                         const updated = { ...form.value, id: editingId.value };
@@ -3720,15 +3566,6 @@
                     if (listenersStarted) return;
                     listenersStarted = true;
 
-                    // ตำแหน่งร้านค้า ซิงค์ผ่าน Firestore (เอกสารเดียว: settings/store)
-                    db.collection('settings').doc('store').onSnapshot((doc) => {
-                        if (doc.exists) {
-                            storeLocation.value = doc.data();
-                        } else {
-                            db.collection('settings').doc('store').set(storeLocation.value);
-                        }
-                    }, (err) => console.error('Firestore (settings) error:', err));
-
                     // ออเดอร์ทั้งหมด ซิงค์แบบเรียลไทม์ระหว่างทุกเครื่องที่เปิดหน้านี้
                     db.collection('orders').onSnapshot((snapshot) => {
                         // snapshot ที่มาจากแคชในเครื่อง (ยังไม่ได้คุยกับเซิร์ฟเวอร์) อาจว่างเปล่าได้ ห้ามเอาไปตัดสินว่าฐานข้อมูลว่าง
@@ -3815,15 +3652,15 @@
                     isFilterSheetOpen, isMobileMenuOpen, activeFilterCount, resetFilters,
                     isExpanded, toggleExpand, cardMenuOrder, runCardMenu, urgencyChip, deliveryLabel, timeSuffix, isFinishedStatus,
                     quickEdit, quickForm, quickInput, quickOrder, quickTitle, quickPay, quickNewTotal, openQuickEdit, closeQuickEdit, saveQuickEdit, quickPayFull,
-                    isModalOpen, showMoreFields, formStep, formStepTitles, formScroll, nextStep, prevStep, onFormSubmit, formErrors, onFormKeydown, isStoreModalOpen, isEditing, form, storeLocation, tempStore, formRemainingAmount,
+                    isModalOpen, showMoreFields, formStep, formStepTitles, formScroll, nextStep, prevStep, onFormSubmit, formErrors, onFormKeydown, isEditing, form, formRemainingAmount,
                     formItemizedMode, formItemsTotal, formItemsGrandTotal, toggleFormItemizedMode, addFormItem, removeFormItem,
                     filteredOrders, activeOrdersCount, statusCounts, completedCount, cancelledCount, totalOrderCount, thisMonthCount, desktopStatusTabs, typeTabs, hasActiveFilters, clearAllFilters, isMoreMenuOpen, cardMoreId, isRangeOpen, rangeFrom, rangeTo, rangeLabel, rangeStats, setRangePreset, clearRange, pendingCount, pickupCount, shippingCount, totalDepositSum, totalRemainingSum,
                     toastMessage, deleteTarget, receiptTarget, selectedForPrint, ordersToPrint,
-                    openModal, closeModal, openStoreModal, saveStoreLocation, saveOrder, confirmDelete, executeDelete,
-                    getRemainingBalance, getDeliveryUrgency, getDistance, formatNumber, formatDate, getStatusClass,
+                    openModal, closeModal, saveOrder, confirmDelete, executeDelete,
+                    getRemainingBalance, getDeliveryUrgency, mapUrlOf, formatNumber, formatDate, getStatusClass,
                     getProgressWidth, isStepActive, getProgressColor, getProgressDotColor, handleStatusChange, unpaidConfirm, resolveUnpaid, unpaidOnly, paymentBadge, statusLabelOf, queueOpen, todayQueue, overdueCount, jumpToOrder, toastUndo, runToastUndo,
                     printSingleWorkOrder, openBatchPrintModal, openReceiptModal, triggerPrintReceipt,
-                    copyShippingAddress, useCurrentLocation, useCurrentStoreLocation, exportDataJSON, importDataJSON,
+                    copyShippingAddress, exportDataJSON, importDataJSON,
                     handleFormImageUpload, rotateFormImage, removeFormImage, isCompressingImage,
                     imageUrlInput, MAX_ORDER_IMAGES, addFormImageFromUrl, getOrderImages,
                     galleryTarget, galleryIndex, openGallery, closeGallery, galleryImages, nextGalleryImage, prevGalleryImage,
