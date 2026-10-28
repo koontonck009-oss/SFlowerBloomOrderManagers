@@ -2299,16 +2299,24 @@
                     includeNote: true
                 });
 
+                // ชื่อเดือนไทยเต็ม ใช้สร้างค่า "ประจำเดือน" ให้ตรงกับวันที่จริง
+                const THAI_MONTHS_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+                const monthLabelOf = (dateStr) => {
+                    const m = /^(\d{4})-(\d{2})/.exec(String(dateStr || ''));
+                    if (!m || +m[2] < 1 || +m[2] > 12) return '';
+                    return THAI_MONTHS_FULL[+m[2] - 1] + ' ' + m[1];
+                };
+
                 const form = ref({
                     customerName: '',
                     customerPhone: '',
                     queueNo: '01',
-                    orderMonth: 'กุมภาพันธ์ 2026',
+                    orderMonth: monthLabelOf(localDateString()),
                     products: '',
                     items: [],
                     notes: '',
                     images: [],
-                    orderDate: new Date().toISOString().split('T')[0],
+                    orderDate: localDateString(),
                     deliveryDate: '',
                     deliveryTime: '',
                     deliveryType: 'shipping',
@@ -2339,7 +2347,7 @@
                         customerName: 'คุณณัฐมน บุญมา',
                         customerPhone: '089-123-4567',
                         queueNo: '01',
-                        orderMonth: 'กุมภาพันธ์ 2026',
+                        orderMonth: monthLabelOf(getTodayString(-1)),
                         products: 'ช่อดอกกุหลาบแดงพรีเมียม 9 ดอก โทนกระดาษสีดำขอบทอง',
                         items: [],
                         notes: 'ขอริบบิ้นสีแดงเข้ม',
@@ -2361,7 +2369,7 @@
                         customerName: 'คุณภัทรพล สุขเสริฐ',
                         customerPhone: '081-999-8877',
                         queueNo: '02',
-                        orderMonth: 'กุมภาพันธ์ 2026',
+                        orderMonth: monthLabelOf(getTodayString(-2)),
                         products: 'ช่อดอกไม้แห้งขนาดใหญ่ โทนสีพาสเทล พร้อมการ์ดอวยพรวันเกิด',
                         items: [],
                         notes: 'ลูกค้ามารับเองหน้าร้าน',
@@ -3129,12 +3137,12 @@
                             customerName: '',
                             customerPhone: '',
                             queueNo: String(orders.value.length + 1).padStart(2, '0'),
-                            orderMonth: 'กันยายน 2026',
+                            orderMonth: monthLabelOf(localDateString()),
                             products: '',
                             items: [{ id: Date.now() + Math.random(), details: '', qty: 1, unit: 'ช่อ', price: '' }],
                             notes: '',
                             images: [],
-                            orderDate: new Date().toISOString().split('T')[0],
+                            orderDate: localDateString(),
                             deliveryDate: '',
                             deliveryTime: '',
                             deliveryType: lastOrder ? lastOrder.deliveryType : 'shipping',
@@ -3695,6 +3703,31 @@
                     showToast('ส่งออกไฟล์บัญชีสำเร็จ');
                 }
 
+                // แก้ "ประจำเดือน" ของออเดอร์เก่าให้ตรงกับเดือนของวันที่สั่ง (ทำครั้งเดียวต่อการเปิดหน้า)
+                // แตะเฉพาะค่าที่เป็นรูปแบบ "ชื่อเดือน ปี" ที่ไม่ตรง ส่วนข้อความอื่นเช่น "วาเลนไทน์" หรือค่าว่างจะไม่แก้
+                let orderMonthFixed = false;
+                const STD_MONTH_RE = new RegExp('^(' + THAI_MONTHS_FULL.join('|') + ') \\d{4}$');
+                function fixOldOrderMonths(list) {
+                    if (orderMonthFixed) return;
+                    orderMonthFixed = true;
+                    const fixes = [];
+                    list.forEach(o => {
+                        const want = monthLabelOf(o.orderDate);
+                        const cur = String(o.orderMonth || '').trim();
+                        if (want && o.id && STD_MONTH_RE.test(cur) && cur !== want) fixes.push({ id: o.id, orderMonth: want });
+                    });
+                    if (!fixes.length) return;
+                    const chunks = [];
+                    for (let i = 0; i < fixes.length; i += 400) chunks.push(fixes.slice(i, i + 400));
+                    Promise.all(chunks.map(chunk => {
+                        const batch = db.batch();
+                        chunk.forEach(f => batch.update(db.collection('orders').doc(f.id), { orderMonth: f.orderMonth }));
+                        return batch.commit();
+                    }))
+                        .then(() => showToast('แก้เดือนของออเดอร์เก่า ' + fixes.length + ' ใบให้ตรงแล้ว'))
+                        .catch((err) => { orderMonthFixed = false; console.error('fixOldOrderMonths failed:', err); });
+                }
+
                 let listenersStarted = false;
 
                 function startFirestoreListeners() {
@@ -3710,6 +3743,7 @@
                             initialOrders.forEach(o => db.collection('orders').doc(o.id).set(o));
                         } else {
                             orders.value = snapshot.docs.map(d => d.data());
+                            if (!fromCache) fixOldOrderMonths(orders.value);
                         }
                         if (!fromCache) isFirstOrdersLoad = false;
                         if (!fromCache || !snapshot.empty) ordersLoaded.value = true;
