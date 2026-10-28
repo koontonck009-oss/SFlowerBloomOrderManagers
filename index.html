@@ -108,6 +108,17 @@
             transform-origin: top left;
         }
 
+        /* Plain CSS (not Tailwind arbitrary classes) so they exist from the very first print,
+           before the Tailwind CDN has had a chance to generate them. */
+        .print-img-grid { display: grid; }
+        .print-img-grid-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .print-img-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .print-img-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .print-img-h-1 { max-height: 135mm; }
+        .print-img-h-2 { max-height: 100mm; }
+        .print-img-h-4 { max-height: 65mm; }
+        .print-img-h-6 { max-height: 42mm; }
+
         /* Print styles for Receipt and Work Order printing */
         @media print {
             body * {
@@ -1301,7 +1312,7 @@
 
                 <!-- Image Box / Sample Preview (supports multiple attached photos, falls back to legacy single imageUrl) -->
                 <div class="image-frame border-2 border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center bg-slate-50/50 mb-3 text-center">
-                    <div v-if="getOrderImages(order).length" class="w-full h-full grid gap-2" :class="printImageGridClass(getOrderImages(order).length)">
+                    <div v-if="getOrderImages(order).length" class="w-full h-full print-img-grid gap-2" :class="printImageGridClass(getOrderImages(order).length)">
                         <div v-for="(img, imgIdx) in getOrderImages(order)" :key="imgIdx" class="flex items-center justify-center overflow-hidden rounded-lg bg-white">
                             <img :src="img.url" alt="Reference" class="max-w-full object-contain" :class="printImageMaxHeightClass(getOrderImages(order).length)" :style="{ transform: 'rotate(' + (img.rotation || 0) + 'deg)' }">
                         </div>
@@ -2769,7 +2780,7 @@
                     return new Promise((resolve) => {
                         printScaleMap.value = {};
                         isMeasuringPrint.value = true;
-                        nextTick(() => {
+                        nextTick(() => waitForPrintImages().then(() => {
                             const PX_PER_MM = 96 / 25.4;
                             const PAGE_PADDING_PX = 64; // Tailwind p-8 (2rem top + 2rem bottom) on .print-page
                             const budgetPx = (272 * PX_PER_MM) - PAGE_PADDING_PX;
@@ -2784,9 +2795,23 @@
                             });
                             printScaleMap.value = newScales;
                             isMeasuringPrint.value = false;
-                            nextTick(resolve);
-                        });
+                            // wait for the scaled layout to be applied before the caller opens the print dialog
+                            nextTick(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                        }));
                     });
+                }
+
+                // Wait (max ~3s) until every image in the work-order print area has loaded, so the
+                // measured height is the real one even the first time a photo is used.
+                function waitForPrintImages() {
+                    const imgs = Array.from(document.querySelectorAll('#printable-work-orders img'));
+                    const pending = imgs.filter(img => !img.complete);
+                    const loaded = Promise.all(pending.map(img => new Promise(res => {
+                        img.addEventListener('load', res, { once: true });
+                        img.addEventListener('error', res, { once: true });
+                    })));
+                    const timeout = new Promise(res => setTimeout(res, 3000));
+                    return Promise.race([loaded, timeout]).then(() => new Promise(res => requestAnimationFrame(() => res())));
                 }
 
                 function getPrintScaleStyle(orderId) {
@@ -3348,16 +3373,16 @@
                 }
 
                 function printImageGridClass(count) {
-                    if (count <= 1) return 'grid-cols-1';
-                    if (count <= 4) return 'grid-cols-2';
-                    return 'grid-cols-3';
+                    if (count <= 1) return 'print-img-grid-1';
+                    if (count <= 4) return 'print-img-grid-2';
+                    return 'print-img-grid-3';
                 }
 
                 function printImageMaxHeightClass(count) {
-                    if (count <= 1) return 'max-h-[135mm]';
-                    if (count <= 2) return 'max-h-[100mm]';
-                    if (count <= 4) return 'max-h-[65mm]';
-                    return 'max-h-[42mm]';
+                    if (count <= 1) return 'print-img-h-1';
+                    if (count <= 2) return 'print-img-h-2';
+                    if (count <= 4) return 'print-img-h-4';
+                    return 'print-img-h-6';
                 }
 
                 function saveOrder() {
